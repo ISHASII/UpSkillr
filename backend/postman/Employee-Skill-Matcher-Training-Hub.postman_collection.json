@@ -1,0 +1,352 @@
+{
+  "info": {
+    "name": "Employee Skill Matcher & Training Hub API",
+    "_postman_id": "5f778ab4-9de0-49ce-8d9f-0d1d1c4d6b02",
+    "description": "Collection untuk testing endpoint auth, role HR, dan role Karyawan.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        }
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register HR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Admin HR\",\n  \"email\": \"hr@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"HR\",\n  \"divisi\": \"Human Resource\",\n  \"skills\": [\"Leadership\", \"Recruitment\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register Karyawan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Karyawan Satu\",\n  \"email\": \"karyawan@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"Karyawan\",\n  \"divisi\": \"Engineering\",\n  \"skills\": [\"Node.js\", \"MongoDB\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login HR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.token) {",
+                  "  pm.collectionVariables.set('hrToken', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hr@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Karyawan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.token) {",
+                  "  pm.collectionVariables.set('karyawanToken', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"karyawan@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Modules (Role Based)",
+      "item": [
+        {
+          "name": "HR - Create Module",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"judul\": \"Advanced Node.js\",\n  \"deskripsi\": \"Pendalaman Node.js untuk backend engineer\",\n  \"linkMateri\": \"https://example.com/node-advanced\",\n  \"targetSkills\": [\"Node.js\", \"System Design\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/modules",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "modules"]
+            }
+          }
+        },
+        {
+          "name": "HR/Karyawan - Get All Modules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "modules"]
+            }
+          }
+        },
+        {
+          "name": "HR - Update Module",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"judul\": \"Advanced Node.js Updated\",\n  \"deskripsi\": \"Materi terbaru backend engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/{{moduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "modules", "{{moduleId}}"]
+            }
+          }
+        },
+        {
+          "name": "HR - Delete Module",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/{{moduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "modules", "{{moduleId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users (Role Karyawan)",
+      "item": [
+        {
+          "name": "Karyawan - Update Profile Skills",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skills\": [\"Node.js\", \"MongoDB\", \"Express.js\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Logs (Role Based)",
+      "item": [
+        {
+          "name": "Karyawan - Create Log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"module_id\": \"{{moduleId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs"]
+            }
+          }
+        },
+        {
+          "name": "Karyawan - Update Log Status to Selesai",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Selesai\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/logs/{{logId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs", "{{logId}}"]
+            }
+          }
+        },
+        {
+          "name": "HR - Get All Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "hrToken",
+      "value": ""
+    },
+    {
+      "key": "karyawanToken",
+      "value": ""
+    },
+    {
+      "key": "moduleId",
+      "value": ""
+    },
+    {
+      "key": "logId",
+      "value": ""
+    }
+  ]
+}
