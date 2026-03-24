@@ -176,9 +176,15 @@ function App() {
 
   const setAuthData = (authData) => {
     setToken(authData.token);
-    setUser(authData.user);
+    // Normalize user object to always include _id for compatibility
+    const normalizedUser = { ...(authData.user || {}) };
+    if (!normalizedUser._id && normalizedUser.id) {
+      normalizedUser._id = normalizedUser.id;
+    }
+
+    setUser(normalizedUser);
     localStorage.setItem("token", authData.token);
-    localStorage.setItem("user", JSON.stringify(authData.user));
+    localStorage.setItem("user", JSON.stringify(normalizedUser));
     navigate(
       authData.user?.role === "HR" ? "/dashboard/hr" : "/dashboard/karyawan",
     );
