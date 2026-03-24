@@ -16,6 +16,7 @@ import HRModulEdit from "./pages/hr/modul/Edit";
 import HRKaryawanIndex from "./pages/hr/karyawan/Index";
 import HRKaryawanCreate from "./pages/hr/karyawan/Create";
 import HRKaryawanEdit from "./pages/hr/karyawan/Edit";
+import HRProfile from "./pages/hr/Profile";
 import KaryawanDashboardPage from "./pages/KaryawanDashboardPage";
 import {
   authApi,
@@ -119,6 +120,12 @@ function App() {
   const [editUserForm, setEditUserForm] = useState({
     nama: "",
     email: "",
+    role: "Karyawan",
+  });
+  const [profileForm, setProfileForm] = useState({
+    nama: "",
+    email: "",
+    divisi: "",
     role: "Karyawan",
   });
   const [editModuleId, setEditModuleId] = useState("");
@@ -254,6 +261,17 @@ function App() {
     fetchLogs();
     fetchUsers();
   }, [isAuthenticated, role]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    setProfileForm({
+      nama: user.nama || "",
+      email: user.email || "",
+      divisi: user.divisi || "",
+      role: user.role || "Karyawan",
+    });
+  }, [user]);
 
   const handleRegister = async (event) => {
     event.preventDefault();
@@ -496,6 +514,35 @@ function App() {
     }
   };
 
+  const handleUpdateProfile = async (event) => {
+    event.preventDefault();
+    if (!user?._id) {
+      showError(null, "User tidak ditemukan");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        nama: profileForm.nama,
+        email: profileForm.email,
+        divisi: profileForm.divisi,
+        role: profileForm.role,
+      };
+
+      const response = await userApi.update(user._id, payload);
+      const updatedUser = response.data.data;
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      showSuccess("Profil berhasil diperbarui");
+    } catch (error) {
+      showError(error, "Gagal memperbarui profil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteUser = async (userId) => {
     if (!window.confirm("Yakin ingin menghapus karyawan ini?")) return;
 
@@ -728,7 +775,7 @@ function App() {
             }
           />
           <Route
-            path="/dashboard/hr/modul/create"
+            path="/dashboard/hr/profile"
             element={
               <RequireRole
                 isAuthenticated={isAuthenticated}
@@ -736,30 +783,11 @@ function App() {
                 allowedRoles={["HR"]}
               >
                 <HRLayout user={user} onLogout={clearAuthData}>
-                  <HRModulCreate
-                    newModuleForm={newModuleForm}
-                    setNewModuleForm={setNewModuleForm}
-                    onCreateModule={handleCreateModule}
-                    loading={loading}
-                  />
-                </HRLayout>
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/dashboard/hr/modul/edit"
-            element={
-              <RequireRole
-                isAuthenticated={isAuthenticated}
-                userRole={role}
-                allowedRoles={["HR"]}
-              >
-                <HRLayout user={user} onLogout={clearAuthData}>
-                  <HRModulEdit
-                    editModuleId={editModuleId}
-                    editModuleForm={editModuleForm}
-                    setEditModuleForm={setEditModuleForm}
-                    onUpdateModule={handleUpdateModule}
+                  <HRProfile
+                    user={user}
+                    editUserForm={profileForm}
+                    setEditUserForm={setProfileForm}
+                    onUpdateUser={handleUpdateProfile}
                     loading={loading}
                   />
                 </HRLayout>
