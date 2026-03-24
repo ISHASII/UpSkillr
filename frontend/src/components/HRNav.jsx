@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 const hrNavItems = [
   { label: "Dashboard", path: "/dashboard/hr" },
   { label: "Modul", path: "/dashboard/hr/modul" },
+  { label: "Karyawan", path: "/dashboard/hr/karyawan" },
 ];
 
 function HRNav() {
@@ -13,6 +14,7 @@ function HRNav() {
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.path === "/dashboard/hr"}
             className={({ isActive }) =>
               `rounded-lg px-3 py-2 text-center text-sm font-medium transition ${
                 isActive

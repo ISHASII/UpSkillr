@@ -13,6 +13,9 @@ import HRDashboard from "./pages/hr/HRDashboard";
 import HRModulIndex from "./pages/hr/modul/Index";
 import HRModulCreate from "./pages/hr/modul/Create";
 import HRModulEdit from "./pages/hr/modul/Edit";
+import HRKaryawanIndex from "./pages/hr/karyawan/Index";
+import HRKaryawanCreate from "./pages/hr/karyawan/Create";
+import HRKaryawanEdit from "./pages/hr/karyawan/Edit";
 import KaryawanDashboardPage from "./pages/KaryawanDashboardPage";
 import {
   authApi,
@@ -103,8 +106,21 @@ function App() {
 
   const [modules, setModules] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [users, setUsers] = useState([]);
 
   const [newModuleForm, setNewModuleForm] = useState(emptyModule);
+  const [newUserForm, setNewUserForm] = useState({
+    nama: "",
+    email: "",
+    password: "",
+    role: "Karyawan",
+  });
+  const [editUserId, setEditUserId] = useState("");
+  const [editUserForm, setEditUserForm] = useState({
+    nama: "",
+    email: "",
+    role: "Karyawan",
+  });
   const [editModuleId, setEditModuleId] = useState("");
   const [editModuleForm, setEditModuleForm] = useState(emptyModule);
 
@@ -223,9 +239,20 @@ function App() {
     }
   };
 
+  const fetchUsers = async () => {
+    if (!isAuthenticated || role !== "HR") return;
+
+    try {
+      const response = await userApi.getAll();
+      setUsers(response.data.data || []);
+    } catch (error) {
+      showError(error, "Gagal mengambil data karyawan");
+    }
+  };
   useEffect(() => {
     fetchModules();
     fetchLogs();
+    fetchUsers();
   }, [isAuthenticated, role]);
 
   const handleRegister = async (event) => {
@@ -426,6 +453,64 @@ function App() {
     }
   };
 
+  const handleCreateUser = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await userApi.create(newUserForm);
+      showSuccess("Karyawan berhasil ditambahkan");
+      setNewUserForm({ nama: "", email: "", password: "", role: "Karyawan" });
+      await fetchUsers();
+    } catch (error) {
+      showError(error, "Gagal menambahkan karyawan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateUser = async (event) => {
+    event.preventDefault();
+    if (!editUserId.trim()) {
+      setToast({ type: "error", message: "Pilih karyawan terlebih dahulu" });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        nama: editUserForm.nama,
+        email: editUserForm.email,
+        role: editUserForm.role,
+      };
+      await userApi.update(editUserId, payload);
+      showSuccess("Data karyawan berhasil diperbarui");
+      setEditUserId("");
+      setEditUserForm({ nama: "", email: "", role: "Karyawan" });
+      await fetchUsers();
+    } catch (error) {
+      showError(error, "Gagal memperbarui karyawan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm("Yakin ingin menghapus karyawan ini?")) return;
+
+    setLoading(true);
+    try {
+      await userApi.remove(userId);
+      showSuccess("Karyawan berhasil dihapus");
+      await fetchUsers();
+    } catch (error) {
+      showError(error, "Gagal menghapus karyawan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderKaryawanDashboard = () => (
     <KaryawanDashboardPage
       user={user}
@@ -540,6 +625,103 @@ function App() {
                     onDeleteModule={handleDeleteModule}
                     setEditModuleId={setEditModuleId}
                     setEditModuleForm={setEditModuleForm}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/modul/create"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRModulCreate
+                    newModuleForm={newModuleForm}
+                    setNewModuleForm={setNewModuleForm}
+                    onCreateModule={handleCreateModule}
+                    loading={loading}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/modul/edit"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRModulEdit
+                    editModuleId={editModuleId}
+                    editModuleForm={editModuleForm}
+                    setEditModuleForm={setEditModuleForm}
+                    onUpdateModule={handleUpdateModule}
+                    loading={loading}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/karyawan"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRKaryawanIndex
+                    users={users}
+                    onDeleteUser={handleDeleteUser}
+                    setEditUserId={setEditUserId}
+                    setEditUserForm={setEditUserForm}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/karyawan/create"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRKaryawanCreate
+                    newUserForm={newUserForm}
+                    setNewUserForm={setNewUserForm}
+                    onCreateUser={handleCreateUser}
+                    loading={loading}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/karyawan/edit"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRKaryawanEdit
+                    editUserId={editUserId}
+                    editUserForm={editUserForm}
+                    setEditUserForm={setEditUserForm}
+                    onUpdateUser={handleUpdateUser}
+                    loading={loading}
                   />
                 </HRLayout>
               </RequireRole>

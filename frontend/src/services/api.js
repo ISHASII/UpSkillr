@@ -54,6 +54,11 @@ export const moduleApi = {
 };
 
 export const userApi = {
+  getAll: () => api.get("/api/users"),
+  create: (payload) => api.post("/api/users", payload),
+  getById: (id) => api.get(`/api/users/${id}`),
+  update: (id, payload) => api.put(`/api/users/${id}`, payload),
+  remove: (id) => api.delete(`/api/users/${id}`),
   updateProfileSkills: (skills) => api.put("/api/users/profile", { skills }),
 };
 
