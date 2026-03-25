@@ -6,7 +6,8 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import Toast from "./components/Toast";
+import Swal from "sweetalert2";
+import "sweetalert2/dist/sweetalert2.min.css";
 import AuthPage from "./pages/AuthPage";
 import HRLayout from "./pages/hr/HRLayout";
 import HRDashboard from "./pages/hr/HRDashboard";
@@ -27,6 +28,7 @@ import {
   moduleApi,
   setUnauthorizedHandler,
   userApi,
+  skillApi,
 } from "./services/api";
 
 const emptyRegister = {
@@ -148,7 +150,6 @@ function App() {
   const [createLogModuleId, setCreateLogModuleId] = useState("");
   const [completeLogId, setCompleteLogId] = useState("");
 
-  const [toast, setToast] = useState({ type: "", message: "" });
   const [loading, setLoading] = useState(false);
 
   const isFullBleedRoute =
@@ -164,15 +165,7 @@ function App() {
   );
   const canManageLogsHR = role === "HR";
 
-  useEffect(() => {
-    if (!toast.message) return undefined;
-
-    const timer = setTimeout(() => {
-      setToast({ type: "", message: "" });
-    }, 3500);
-
-    return () => clearTimeout(timer);
-  }, [toast]);
+  // SweetAlert2 will handle all notifications and confirmations
 
   const clearAuthData = (message) => {
     setToken("");
@@ -183,7 +176,13 @@ function App() {
     localStorage.removeItem("user");
 
     if (message) {
-      setToast({ type: "error", message });
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: message,
+        confirmButtonText: "OK",
+        width: 420,
+      });
     }
   };
 
@@ -205,11 +204,23 @@ function App() {
 
   const showError = (error, fallbackMessage) => {
     const message = error?.response?.data?.message || fallbackMessage;
-    setToast({ type: "error", message });
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: message,
+      confirmButtonText: "OK",
+      width: 420,
+    });
   };
 
   const showSuccess = (message) => {
-    setToast({ type: "success", message });
+    Swal.fire({
+      icon: "success",
+      title: "Sukses",
+      text: message,
+      confirmButtonText: "OK",
+      width: 420,
+    });
   };
 
   useEffect(() => {
@@ -282,6 +293,7 @@ function App() {
       const response = await skillApi.getAll();
       setSkills(response.data.data || []);
     } catch (error) {
+      console.error("[App] fetchSkills error", error, error?.response?.data);
       showError(error, "Gagal mengambil data skill");
     }
   };
@@ -366,6 +378,7 @@ function App() {
       showSuccess("Modul berhasil dibuat");
       setNewModuleForm(emptyModule);
       await fetchModules();
+      navigate("/dashboard/hr/modul");
     } catch (error) {
       showError(error, "Gagal membuat modul");
     } finally {
@@ -376,7 +389,13 @@ function App() {
   const handleUpdateModule = async (event) => {
     event.preventDefault();
     if (!editModuleId.trim()) {
-      setToast({ type: "error", message: "Isi Module ID terlebih dahulu" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Isi Module ID terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
       return;
     }
 
@@ -403,6 +422,7 @@ function App() {
       await moduleApi.update(editModuleId, payload);
       showSuccess("Modul berhasil diperbarui");
       await fetchModules();
+      navigate("/dashboard/hr/modul");
     } catch (error) {
       showError(error, "Gagal memperbarui modul");
     } finally {
@@ -411,7 +431,15 @@ function App() {
   };
 
   const handleDeleteModule = async (moduleId) => {
-    if (!window.confirm("Yakin ingin menghapus modul ini?")) return;
+    const result = await Swal.fire({
+      title: "Yakin ingin menghapus modul ini?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Tidak",
+      width: 420,
+    });
+    if (!result.isConfirmed) return;
 
     setLoading(true);
     try {
@@ -450,7 +478,13 @@ function App() {
   const handleCreateLog = async (event) => {
     event.preventDefault();
     if (!createLogModuleId.trim()) {
-      setToast({ type: "error", message: "Isi Module ID terlebih dahulu" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Isi Module ID terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
       return;
     }
 
@@ -472,7 +506,13 @@ function App() {
   const handleCompleteLog = async (event) => {
     event.preventDefault();
     if (!completeLogId.trim()) {
-      setToast({ type: "error", message: "Isi Log ID terlebih dahulu" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Isi Log ID terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
       return;
     }
 
@@ -513,6 +553,7 @@ function App() {
         divisi: "General",
       });
       await fetchUsers();
+      navigate("/dashboard/hr/karyawan");
     } catch (error) {
       showError(error, "Gagal menambahkan karyawan");
     } finally {
@@ -534,7 +575,13 @@ function App() {
       showSuccess("Skill berhasil dibuat");
       setNewSkillForm({ nama: "", deskripsi: "" });
       await fetchSkills();
+      navigate("/dashboard/hr/skills");
     } catch (error) {
+      console.error(
+        "[App] handleCreateSkill error",
+        error,
+        error?.response?.data,
+      );
       showError(error, "Gagal membuat skill");
     } finally {
       setLoading(false);
@@ -544,7 +591,13 @@ function App() {
   const handleUpdateSkill = async (event) => {
     event.preventDefault();
     if (!editSkillId.trim()) {
-      setToast({ type: "error", message: "Pilih skill terlebih dahulu" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Pilih skill terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
       return;
     }
 
@@ -554,12 +607,19 @@ function App() {
         nama: editSkillForm.nama,
         deskripsi: editSkillForm.deskripsi,
       };
-      await skillApi.update(editSkillId, payload);
+      const response = await skillApi.update(editSkillId, payload);
+      console.log("[App] handleUpdateSkill response", response?.data);
       showSuccess("Skill berhasil diperbarui");
       setEditSkillId("");
       setEditSkillForm({ nama: "", deskripsi: "" });
       await fetchSkills();
+      navigate("/dashboard/hr/skills");
     } catch (error) {
+      console.error(
+        "[App] handleUpdateSkill error",
+        error,
+        error?.response?.data,
+      );
       showError(error, "Gagal memperbarui skill");
     } finally {
       setLoading(false);
@@ -567,14 +627,28 @@ function App() {
   };
 
   const handleDeleteSkill = async (skillId) => {
-    if (!window.confirm("Yakin ingin menghapus skill ini?")) return;
+    const result = await Swal.fire({
+      title: "Yakin ingin menghapus skill ini?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Tidak",
+      width: 420,
+    });
+    if (!result.isConfirmed) return;
 
     setLoading(true);
     try {
-      await skillApi.remove(skillId);
+      const response = await skillApi.remove(skillId);
+      console.log("[App] handleDeleteSkill response", response?.data);
       showSuccess("Skill berhasil dihapus");
       await fetchSkills();
     } catch (error) {
+      console.error(
+        "[App] handleDeleteSkill error",
+        error,
+        error?.response?.data,
+      );
       showError(error, "Gagal menghapus skill");
     } finally {
       setLoading(false);
@@ -584,7 +658,13 @@ function App() {
   const handleUpdateUser = async (event) => {
     event.preventDefault();
     if (!editUserId.trim()) {
-      setToast({ type: "error", message: "Pilih karyawan terlebih dahulu" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Pilih karyawan terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
       return;
     }
 
@@ -602,6 +682,7 @@ function App() {
       setEditUserId("");
       setEditUserForm({ nama: "", email: "", role: "Karyawan", divisi: "" });
       await fetchUsers();
+      navigate("/dashboard/hr/karyawan");
     } catch (error) {
       showError(error, "Gagal memperbarui karyawan");
     } finally {
@@ -650,7 +731,15 @@ function App() {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Yakin ingin menghapus karyawan ini?")) return;
+    const result = await Swal.fire({
+      title: "Yakin ingin menghapus karyawan ini?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Tidak",
+      width: 420,
+    });
+    if (!result.isConfirmed) return;
 
     setLoading(true);
     try {
@@ -691,11 +780,7 @@ function App() {
           : "bg-slate-900 px-4 py-6 text-slate-100 sm:px-6 lg:px-8"
       }`}
     >
-      <Toast
-        type={toast.type}
-        message={toast.message}
-        onClose={() => setToast({ type: "", message: "" })}
-      />
+      {/* Notifications handled by SweetAlert2 */}
 
       <div
         className={`mx-auto w-full ${isFullBleedRoute ? "max-w-none" : "max-w-7xl"}`}

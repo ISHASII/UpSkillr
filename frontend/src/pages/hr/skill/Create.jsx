@@ -36,7 +36,7 @@ function HRSkillCreate({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
-            onClick={() => navigate("/dashboard/hr/skill")}
+            onClick={() => navigate("/dashboard/hr/skills")}
             className="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300"
           >
             Back

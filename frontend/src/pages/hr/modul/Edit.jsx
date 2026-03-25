@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 function HRModulEdit({
@@ -9,6 +10,18 @@ function HRModulEdit({
   skills,
 }) {
   const navigate = useNavigate();
+
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
+
   const toggleSkill = (skillId) => {
     setEditModuleForm((prev) => {
       const list = Array.isArray(prev.targetSkills)
@@ -20,6 +33,16 @@ function HRModulEdit({
       return { ...prev, targetSkills: list };
     });
   };
+
+  const selectedNames = (editModuleForm.targetSkills || [])
+    .map((idOrObj) => {
+      const id = idOrObj && idOrObj._id ? idOrObj._id : idOrObj;
+      const s = skills.find((sk) => sk._id === id);
+      return s ? s.nama : id;
+    })
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(", ");
 
   return (
     <div className="glass-card rounded-2xl border border-slate-300/45 bg-white/35 p-5 sm:p-6">
@@ -59,31 +82,45 @@ function HRModulEdit({
           }
         />
 
-        <div>
+        <div ref={ref} className="relative">
           <div className="mb-2 text-sm font-medium text-slate-800">
             Target Skills
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {skills.length ? (
-              skills.map((skill) => (
-                <label key={skill._id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={(editModuleForm.targetSkills || []).some(
-                      (s) => s === skill._id || s?._id === skill._id,
-                    )}
-                    onChange={() => toggleSkill(skill._id)}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-slate-700">{skill.nama}</span>
-                </label>
-              ))
-            ) : (
-              <div className="text-sm text-slate-500">
-                Belum ada skill tersedia
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="glass-input w-full rounded-lg px-3 py-2 text-left text-sm text-white outline-none placeholder:text-slate-300"
+          >
+            {selectedNames || "Pilih target skills..."}
+          </button>
+
+          {open && (
+            <div className="absolute z-50 mt-2 max-h-56 w-full overflow-auto rounded-md bg-white p-3 shadow-lg ring-1 ring-slate-200">
+              <div className="grid grid-cols-2 gap-2">
+                {skills.length ? (
+                  skills.map((skill) => (
+                    <label key={skill._id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(editModuleForm.targetSkills || []).some(
+                          (s) => s === skill._id || s?._id === skill._id,
+                        )}
+                        onChange={() => toggleSkill(skill._id)}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-slate-700">
+                        {skill.nama}
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="text-sm text-slate-500">
+                    Belum ada skill tersedia
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
