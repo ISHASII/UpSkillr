@@ -4,6 +4,7 @@ const hrNavItems = [
   { label: "Dashboard", path: "/dashboard/hr" },
   { label: "Modul", path: "/dashboard/hr/modul" },
   { label: "Karyawan", path: "/dashboard/hr/karyawan" },
+  { label: "Skill", path: "/dashboard/hr/skills" },
 ];
 
 function HRNav() {

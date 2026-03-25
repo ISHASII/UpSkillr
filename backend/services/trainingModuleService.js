@@ -5,18 +5,18 @@ const createTrainingModule = async (payload) => {
 };
 
 const getAllTrainingModules = async () => {
-  return TrainingModule.find();
+  return TrainingModule.find().populate("targetSkills");
 };
 
 const getTrainingModuleById = async (id) => {
-  return TrainingModule.findById(id);
+  return TrainingModule.findById(id).populate("targetSkills");
 };
 
 const updateTrainingModule = async (id, payload) => {
   return TrainingModule.findByIdAndUpdate(id, payload, {
     new: true,
     runValidators: true,
-  });
+  }).populate("targetSkills");
 };
 
 const deleteTrainingModule = async (id) => {

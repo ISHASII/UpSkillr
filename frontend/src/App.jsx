@@ -17,6 +17,9 @@ import HRKaryawanIndex from "./pages/hr/karyawan/Index";
 import HRKaryawanCreate from "./pages/hr/karyawan/Create";
 import HRKaryawanEdit from "./pages/hr/karyawan/Edit";
 import HRProfile from "./pages/hr/Profile";
+import HRSkillIndex from "./pages/hr/skill/Index";
+import HRSkillCreate from "./pages/hr/skill/Create";
+import HRSkillEdit from "./pages/hr/skill/Edit";
 import KaryawanDashboardPage from "./pages/KaryawanDashboardPage";
 import {
   authApi,
@@ -45,7 +48,7 @@ const emptyModule = {
   judul: "",
   deskripsi: "",
   linkMateri: "",
-  targetSkills: "",
+  targetSkills: [],
 };
 
 const parseStoredUser = () => {
@@ -115,12 +118,14 @@ function App() {
     email: "",
     password: "",
     role: "Karyawan",
+    divisi: "General",
   });
   const [editUserId, setEditUserId] = useState("");
   const [editUserForm, setEditUserForm] = useState({
     nama: "",
     email: "",
     role: "Karyawan",
+    divisi: "",
   });
   const [profileForm, setProfileForm] = useState({
     nama: "",
@@ -130,6 +135,14 @@ function App() {
   });
   const [editModuleId, setEditModuleId] = useState("");
   const [editModuleForm, setEditModuleForm] = useState(emptyModule);
+
+  const [skills, setSkills] = useState([]);
+  const [newSkillForm, setNewSkillForm] = useState({ nama: "", deskripsi: "" });
+  const [editSkillId, setEditSkillId] = useState("");
+  const [editSkillForm, setEditSkillForm] = useState({
+    nama: "",
+    deskripsi: "",
+  });
 
   const [skillsInput, setSkillsInput] = useState("");
   const [createLogModuleId, setCreateLogModuleId] = useState("");
@@ -262,10 +275,21 @@ function App() {
       showError(error, "Gagal mengambil data karyawan");
     }
   };
+  const fetchSkills = async () => {
+    if (!isAuthenticated || role !== "HR") return;
+
+    try {
+      const response = await skillApi.getAll();
+      setSkills(response.data.data || []);
+    } catch (error) {
+      showError(error, "Gagal mengambil data skill");
+    }
+  };
   useEffect(() => {
     fetchModules();
     fetchLogs();
     fetchUsers();
+    fetchSkills();
   }, [isAuthenticated, role]);
 
   useEffect(() => {
@@ -329,14 +353,13 @@ function App() {
   const handleCreateModule = async (event) => {
     event.preventDefault();
     setLoading(true);
-
     try {
       const payload = {
         ...newModuleForm,
-        targetSkills: newModuleForm.targetSkills
-          .split(",")
-          .map((skill) => skill.trim())
-          .filter(Boolean),
+        // targetSkills should be array of skill IDs
+        targetSkills: Array.isArray(newModuleForm.targetSkills)
+          ? newModuleForm.targetSkills
+          : [],
       };
 
       await moduleApi.create(payload);
@@ -364,10 +387,9 @@ function App() {
         judul: editModuleForm.judul,
         deskripsi: editModuleForm.deskripsi,
         linkMateri: editModuleForm.linkMateri,
-        targetSkills: editModuleForm.targetSkills
-          .split(",")
-          .map((skill) => skill.trim())
-          .filter(Boolean),
+        targetSkills: Array.isArray(editModuleForm.targetSkills)
+          ? editModuleForm.targetSkills
+          : [],
       };
 
       Object.keys(payload).forEach((key) => {
@@ -427,19 +449,18 @@ function App() {
 
   const handleCreateLog = async (event) => {
     event.preventDefault();
-
     if (!createLogModuleId.trim()) {
-      setToast({ type: "error", message: "Pilih module terlebih dahulu" });
+      setToast({ type: "error", message: "Isi Module ID terlebih dahulu" });
       return;
     }
 
     setLoading(true);
     try {
-      const response = await logApi.create(createLogModuleId);
-      const newLog = response.data.data;
-      setLogs((prev) => [newLog, ...prev]);
-      setCompleteLogId(newLog?._id || "");
+      const response = await logApi.create({ module_id: createLogModuleId });
+      const createdLog = response.data.data;
+      setLogs((prev) => [createdLog, ...prev]);
       showSuccess("Progress log berhasil dibuat");
+      setCreateLogModuleId("");
       await fetchModules();
     } catch (error) {
       showError(error, "Gagal membuat progress log");
@@ -484,10 +505,77 @@ function App() {
     try {
       const response = await userApi.create(newUserForm);
       showSuccess("Karyawan berhasil ditambahkan");
-      setNewUserForm({ nama: "", email: "", password: "", role: "Karyawan" });
+      setNewUserForm({
+        nama: "",
+        email: "",
+        password: "",
+        role: "Karyawan",
+        divisi: "General",
+      });
       await fetchUsers();
     } catch (error) {
       showError(error, "Gagal menambahkan karyawan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSkill = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+
+    try {
+      const payload = {
+        nama: newSkillForm.nama,
+        deskripsi: newSkillForm.deskripsi,
+      };
+
+      await skillApi.create(payload);
+      showSuccess("Skill berhasil dibuat");
+      setNewSkillForm({ nama: "", deskripsi: "" });
+      await fetchSkills();
+    } catch (error) {
+      showError(error, "Gagal membuat skill");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateSkill = async (event) => {
+    event.preventDefault();
+    if (!editSkillId.trim()) {
+      setToast({ type: "error", message: "Pilih skill terlebih dahulu" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        nama: editSkillForm.nama,
+        deskripsi: editSkillForm.deskripsi,
+      };
+      await skillApi.update(editSkillId, payload);
+      showSuccess("Skill berhasil diperbarui");
+      setEditSkillId("");
+      setEditSkillForm({ nama: "", deskripsi: "" });
+      await fetchSkills();
+    } catch (error) {
+      showError(error, "Gagal memperbarui skill");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSkill = async (skillId) => {
+    if (!window.confirm("Yakin ingin menghapus skill ini?")) return;
+
+    setLoading(true);
+    try {
+      await skillApi.remove(skillId);
+      showSuccess("Skill berhasil dihapus");
+      await fetchSkills();
+    } catch (error) {
+      showError(error, "Gagal menghapus skill");
     } finally {
       setLoading(false);
     }
@@ -507,11 +595,12 @@ function App() {
         nama: editUserForm.nama,
         email: editUserForm.email,
         role: editUserForm.role,
+        divisi: editUserForm.divisi,
       };
       await userApi.update(editUserId, payload);
       showSuccess("Data karyawan berhasil diperbarui");
       setEditUserId("");
-      setEditUserForm({ nama: "", email: "", role: "Karyawan" });
+      setEditUserForm({ nama: "", email: "", role: "Karyawan", divisi: "" });
       await fetchUsers();
     } catch (error) {
       showError(error, "Gagal memperbarui karyawan");
@@ -539,8 +628,19 @@ function App() {
 
       const response = await userApi.update(user._id, payload);
       const updatedUser = response.data.data;
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      // normalize id field if backend returns `id` instead of `_id`
+      const normalized = { ...(updatedUser || {}) };
+      if (!normalized._id && normalized.id) normalized._id = normalized.id;
+
+      setUser(normalized);
+      localStorage.setItem("user", JSON.stringify(normalized));
+      // update profile form so UI reflects latest data immediately
+      setProfileForm({
+        nama: normalized.nama || "",
+        email: normalized.email || "",
+        divisi: normalized.divisi || "",
+        role: normalized.role || "Karyawan",
+      });
       showSuccess("Profil berhasil diperbarui");
     } catch (error) {
       showError(error, "Gagal memperbarui profil");
@@ -697,6 +797,7 @@ function App() {
                     setNewModuleForm={setNewModuleForm}
                     onCreateModule={handleCreateModule}
                     loading={loading}
+                    skills={skills}
                   />
                 </HRLayout>
               </RequireRole>
@@ -717,6 +818,7 @@ function App() {
                     setEditModuleForm={setEditModuleForm}
                     onUpdateModule={handleUpdateModule}
                     loading={loading}
+                    skills={skills}
                   />
                 </HRLayout>
               </RequireRole>
@@ -774,6 +876,63 @@ function App() {
                     editUserForm={editUserForm}
                     setEditUserForm={setEditUserForm}
                     onUpdateUser={handleUpdateUser}
+                    loading={loading}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/skills"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRSkillIndex
+                    skills={skills}
+                    onDeleteSkill={handleDeleteSkill}
+                    setEditSkillId={setEditSkillId}
+                    setEditSkillForm={setEditSkillForm}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/skills/create"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRSkillCreate
+                    newSkillForm={newSkillForm}
+                    setNewSkillForm={setNewSkillForm}
+                    onCreateSkill={handleCreateSkill}
+                    loading={loading}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/skills/edit"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRSkillEdit
+                    editSkillForm={editSkillForm}
+                    setEditSkillForm={setEditSkillForm}
+                    onUpdateSkill={handleUpdateSkill}
                     loading={loading}
                   />
                 </HRLayout>

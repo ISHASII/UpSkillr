@@ -19,8 +19,8 @@ const trainingModuleSchema = new mongoose.Schema(
     },
     targetSkills: [
       {
-        type: String,
-        trim: true,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Skill",
       },
     ],
   },

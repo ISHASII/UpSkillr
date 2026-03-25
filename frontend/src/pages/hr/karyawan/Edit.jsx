@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 function HRKaryawanEdit({
   editUserId,
   editUserForm,
@@ -5,18 +7,14 @@ function HRKaryawanEdit({
   onUpdateUser,
   loading,
 }) {
+  const navigate = useNavigate();
   return (
     <div className="glass-card rounded-2xl border border-slate-300/45 bg-white/35 p-5 sm:p-6">
       <h2 className="mb-4 text-lg font-semibold text-slate-900">
         Edit Karyawan
       </h2>
       <form className="space-y-3" onSubmit={onUpdateUser}>
-        <input
-          className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-slate-300"
-          placeholder="User ID"
-          value={editUserId}
-          readOnly
-        />
+        {/* Employee ID intentionally hidden in edit form */}
         <input
           className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-slate-300"
           placeholder="Nama"
@@ -46,13 +44,32 @@ function HRKaryawanEdit({
           <option value="Karyawan">Karyawan</option>
           <option value="HR">HR</option>
         </select>
-        <button
-          type="submit"
-          className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-400"
-          disabled={loading}
-        >
-          Update
-        </button>
+        <input
+          className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-slate-300"
+          placeholder="Divisi"
+          value={editUserForm.divisi}
+          onChange={(event) =>
+            setEditUserForm((prev) => ({ ...prev, divisi: event.target.value }))
+          }
+          required
+        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard/hr/karyawan")}
+            className="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300"
+          >
+            Back
+          </button>
+
+          <button
+            type="submit"
+            className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-400"
+            disabled={loading}
+          >
+            Update
+          </button>
+        </div>
       </form>
     </div>
   );

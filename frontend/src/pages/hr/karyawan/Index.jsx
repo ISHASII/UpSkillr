@@ -52,6 +52,8 @@ function HRKaryawanIndex({
                               nama: user.nama || "",
                               email: user.email || "",
                               role: user.role || "Karyawan",
+                              divisi: user.divisi || "",
+                              skills: user.skills || [],
                             });
                             navigate("/dashboard/hr/karyawan/edit");
                           }}
