@@ -21,7 +21,10 @@ import HRProfile from "./pages/hr/Profile";
 import HRSkillIndex from "./pages/hr/skill/Index";
 import HRSkillCreate from "./pages/hr/skill/Create";
 import HRSkillEdit from "./pages/hr/skill/Edit";
-import KaryawanDashboardPage from "./pages/KaryawanDashboardPage";
+import KaryawanLayout from "./pages/karyawan/Layout";
+import KaryawanDashboardPage from "./pages/karyawan/Index";
+import KaryawanModulPage from "./pages/karyawan/Modul";
+import KaryawanProfile from "./pages/karyawan/Profile";
 import {
   authApi,
   logApi,
@@ -455,7 +458,7 @@ function App() {
   };
 
   const handleUpdateSkills = async (event) => {
-    event.preventDefault();
+    if (event?.preventDefault) event.preventDefault();
     setLoading(true);
 
     try {
@@ -477,7 +480,7 @@ function App() {
   };
 
   const handleCreateLog = async (event) => {
-    event.preventDefault();
+    if (event?.preventDefault) event.preventDefault();
     if (!createLogModuleId.trim()) {
       await Swal.fire({
         icon: "error",
@@ -491,7 +494,7 @@ function App() {
 
     setLoading(true);
     try {
-      const response = await logApi.create({ module_id: createLogModuleId });
+      const response = await logApi.create(createLogModuleId);
       const createdLog = response.data.data;
       setLogs((prev) => [createdLog, ...prev]);
       showSuccess("Progress log berhasil dibuat");
@@ -505,7 +508,7 @@ function App() {
   };
 
   const handleCompleteLog = async (event) => {
-    event.preventDefault();
+    if (event?.preventDefault) event.preventDefault();
     if (!completeLogId.trim()) {
       await Swal.fire({
         icon: "error",
@@ -715,7 +718,7 @@ function App() {
         nama: profileForm.nama,
         email: profileForm.email,
         divisi: profileForm.divisi,
-        role: profileForm.role,
+        role: role === "Karyawan" ? "Karyawan" : profileForm.role,
       };
 
       const response = await userApi.update(user._id, payload);
@@ -766,14 +769,9 @@ function App() {
 
   const renderKaryawanDashboard = () => (
     <KaryawanDashboardPage
-      user={user}
       loading={loading}
       modules={modules}
       logs={logs}
-      onLogout={clearAuthData}
-      skillsInput={skillsInput}
-      setSkillsInput={setSkillsInput}
-      onUpdateSkills={handleUpdateSkills}
       createLogModuleId={createLogModuleId}
       setCreateLogModuleId={setCreateLogModuleId}
       completeLogId={completeLogId}
@@ -1063,7 +1061,43 @@ function App() {
                 userRole={role}
                 allowedRoles={["Karyawan"]}
               >
-                {renderKaryawanDashboard()}
+                <KaryawanLayout user={user} onLogout={clearAuthData}>
+                  {renderKaryawanDashboard()}
+                </KaryawanLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/karyawan/modul"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["Karyawan"]}
+              >
+                <KaryawanLayout user={user} onLogout={clearAuthData}>
+                  <KaryawanModulPage modules={modules} />
+                </KaryawanLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/karyawan/profile"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["Karyawan"]}
+              >
+                <KaryawanLayout user={user} onLogout={clearAuthData}>
+                  <KaryawanProfile
+                    user={user}
+                    profileForm={profileForm}
+                    setProfileForm={setProfileForm}
+                    onUpdateProfile={handleUpdateProfile}
+                    loading={loading}
+                  />
+                </KaryawanLayout>
               </RequireRole>
             }
           />
