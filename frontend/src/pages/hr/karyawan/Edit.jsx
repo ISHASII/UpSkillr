@@ -34,6 +34,18 @@ function HRKaryawanEdit({
           }
           required
         />
+        <input
+          className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-slate-300"
+          type="password"
+          placeholder="Password (kosongkan jika tidak diubah)"
+          value={editUserForm.password || ""}
+          onChange={(event) =>
+            setEditUserForm((prev) => ({
+              ...prev,
+              password: event.target.value,
+            }))
+          }
+        />
         <select
           className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none"
           value={editUserForm.role}

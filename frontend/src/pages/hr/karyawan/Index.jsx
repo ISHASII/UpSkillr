@@ -54,6 +54,7 @@ function HRKaryawanIndex({
                               role: user.role || "Karyawan",
                               divisi: user.divisi || "",
                               skills: user.skills || [],
+                              password: "",
                             });
                             navigate("/dashboard/hr/karyawan/edit");
                           }}

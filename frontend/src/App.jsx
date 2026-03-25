@@ -128,6 +128,7 @@ function App() {
     email: "",
     role: "Karyawan",
     divisi: "",
+    password: "",
   });
   const [profileForm, setProfileForm] = useState({
     nama: "",
@@ -677,10 +678,20 @@ function App() {
         role: editUserForm.role,
         divisi: editUserForm.divisi,
       };
+      // If HR provided a new password, include it in the update payload
+      if (editUserForm.password && editUserForm.password.trim() !== "") {
+        payload.password = editUserForm.password;
+      }
       await userApi.update(editUserId, payload);
       showSuccess("Data karyawan berhasil diperbarui");
       setEditUserId("");
-      setEditUserForm({ nama: "", email: "", role: "Karyawan", divisi: "" });
+      setEditUserForm({
+        nama: "",
+        email: "",
+        role: "Karyawan",
+        divisi: "",
+        password: "",
+      });
       await fetchUsers();
       navigate("/dashboard/hr/karyawan");
     } catch (error) {
