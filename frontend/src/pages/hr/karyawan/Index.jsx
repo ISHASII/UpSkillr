@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 function HRKaryawanIndex({
   users,
   onDeleteUser,
+  onApproveRegistration,
+  onRejectRegistration,
   setEditUserId,
   setEditUserForm,
 }) {
@@ -31,6 +33,7 @@ function HRKaryawanIndex({
                 <th className="px-2 py-2">Nama</th>
                 <th className="px-2 py-2">Email</th>
                 <th className="px-2 py-2">Role</th>
+                <th className="px-2 py-2">Status Registrasi</th>
                 <th className="px-2 py-2">Aksi</th>
               </tr>
             </thead>
@@ -41,8 +44,32 @@ function HRKaryawanIndex({
                     <td className="px-2 py-2 text-slate-800">{user.nama}</td>
                     <td className="px-2 py-2 text-slate-700">{user.email}</td>
                     <td className="px-2 py-2 text-slate-700">{user.role}</td>
+                    <td className="px-2 py-2 text-slate-700">
+                      {user.role === "Karyawan"
+                        ? user.registrationStatus || "approved"
+                        : "-"}
+                    </td>
                     <td className="px-2 py-2">
                       <div className="flex gap-2">
+                        {user.role === "Karyawan" &&
+                        user.registrationStatus === "pending" ? (
+                          <>
+                            <button
+                              type="button"
+                              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-400"
+                              onClick={() => onApproveRegistration(user)}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-400"
+                              onClick={() => onRejectRegistration(user)}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : null}
                         <button
                           type="button"
                           className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-400"
@@ -52,6 +79,9 @@ function HRKaryawanIndex({
                               nama: user.nama || "",
                               email: user.email || "",
                               role: user.role || "Karyawan",
+                              divisi: user.divisi || "",
+                              skills: user.skills || [],
+                              password: "",
                             });
                             navigate("/dashboard/hr/karyawan/edit");
                           }}
@@ -72,7 +102,7 @@ function HRKaryawanIndex({
               ) : (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="px-2 py-4 text-center text-slate-600"
                   >
                     Belum ada data karyawan.

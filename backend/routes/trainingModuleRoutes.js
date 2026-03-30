@@ -3,6 +3,7 @@ const trainingModuleController = require("../controllers/trainingModuleControlle
 const authMiddleware = require("../middlewares/authMiddleware");
 const roleMiddleware = require("../middlewares/roleMiddleware");
 const asyncHandler = require("../middlewares/asyncHandler");
+const { uploadModuleMaterials } = require("../middlewares/uploadMiddleware");
 
 const router = express.Router();
 
@@ -13,10 +14,18 @@ router.get(
   asyncHandler(trainingModuleController.getTrainingModules),
 );
 
+router.get(
+  "/recommendations/me",
+  authMiddleware,
+  roleMiddleware("Karyawan"),
+  asyncHandler(trainingModuleController.getRecommendedTrainingModules),
+);
+
 router.post(
   "/",
   authMiddleware,
   roleMiddleware("HR"),
+  uploadModuleMaterials,
   asyncHandler(trainingModuleController.createTrainingModule),
 );
 
@@ -24,6 +33,7 @@ router.put(
   "/:id",
   authMiddleware,
   roleMiddleware("HR"),
+  uploadModuleMaterials,
   asyncHandler(trainingModuleController.updateTrainingModule),
 );
 

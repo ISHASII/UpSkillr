@@ -32,6 +32,7 @@ http://localhost:5000
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/google`
 
 ### Modules (Role-based)
 
@@ -133,6 +134,76 @@ Body (JSON):
 Respon sukses: status `200`, berisi `data.token` dan `data.user`.
 
 Simpan token ini untuk endpoint yang dilindungi.
+
+---
+
+### 4.3.1 Auth - Login Google
+
+Login menggunakan Google ID Token:
+
+```text
+POST http://localhost:5000/api/auth/google
+```
+
+Body (JSON):
+
+```json
+{
+  "credential": "GOOGLE_ID_TOKEN_DARI_FRONTEND"
+}
+```
+
+Catatan behavior:
+
+- User role `HR` / `HRD` tidak butuh approval.
+- User role `Karyawan` tetap mengikuti validasi HRD (`pending` / `approved` / `rejected`).
+
+---
+
+## 5) Cara Implementasi Google Auth (Client ID + Token)
+
+### 5.1 Dapatkan Google OAuth Client ID
+
+1. Buka Google Cloud Console.
+2. Buat Project baru (atau pilih project existing).
+3. Masuk ke **APIs & Services** → **OAuth consent screen**:
+
+- pilih tipe External/Internal,
+- isi app name + email,
+- save.
+
+4. Masuk ke **Credentials** → **Create Credentials** → **OAuth client ID**.
+5. Pilih **Web application**.
+6. Tambahkan Authorized JavaScript origins:
+
+- `http://localhost:5173` (frontend Vite)
+
+7. Simpan dan copy **Client ID**.
+
+### 5.2 Pasang Environment Variable
+
+Backend `.env`:
+
+```env
+GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
+```
+
+Frontend `.env`:
+
+```env
+VITE_GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
+VITE_API_URL=http://localhost:5000
+```
+
+### 5.3 Dari mana token Google (`credential`) didapat?
+
+- Token `credential` (Google ID Token) dihasilkan otomatis oleh komponen `GoogleLogin` di frontend.
+- Saat user klik tombol Login with Google dan sukses, callback frontend akan menerima object berisi `credential`.
+- Frontend mengirim `credential` itu ke backend endpoint `/api/auth/google`.
+
+### 5.4 Jalankan Ulang Aplikasi
+
+Setelah update `.env`, restart backend dan frontend agar env baru terbaca.
 
 ---
 

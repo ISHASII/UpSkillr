@@ -5,6 +5,7 @@ const createTrainingModule = async (req, res, next) => {
   try {
     const moduleData = await trainingModuleService.createTrainingModule(
       req.body,
+      req.files,
     );
 
     res.status(201).json({
@@ -20,6 +21,22 @@ const createTrainingModule = async (req, res, next) => {
 const getTrainingModules = async (req, res, next) => {
   try {
     const modules = await trainingModuleService.getAllTrainingModules();
+
+    res.status(200).json({
+      success: true,
+      data: modules,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getRecommendedTrainingModules = async (req, res, next) => {
+  try {
+    const modules =
+      await trainingModuleService.getRecommendedTrainingModulesForUser(
+        req.user._id,
+      );
 
     res.status(200).json({
       success: true,
@@ -73,6 +90,7 @@ const updateTrainingModule = async (req, res, next) => {
     const moduleData = await trainingModuleService.updateTrainingModule(
       id,
       req.body,
+      req.files,
     );
 
     if (!moduleData) {
@@ -124,6 +142,7 @@ const deleteTrainingModule = async (req, res, next) => {
 module.exports = {
   createTrainingModule,
   getTrainingModules,
+  getRecommendedTrainingModules,
   getTrainingModuleById,
   updateTrainingModule,
   deleteTrainingModule,

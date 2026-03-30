@@ -6,23 +6,33 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import Toast from "./components/Toast";
+import Swal from "sweetalert2";
+import "sweetalert2/dist/sweetalert2.min.css";
 import AuthPage from "./pages/AuthPage";
 import HRLayout from "./pages/hr/HRLayout";
 import HRDashboard from "./pages/hr/HRDashboard";
 import HRModulIndex from "./pages/hr/modul/Index";
 import HRModulCreate from "./pages/hr/modul/Create";
 import HRModulEdit from "./pages/hr/modul/Edit";
+import HRModulParticipants from "./pages/hr/modul/Participants";
 import HRKaryawanIndex from "./pages/hr/karyawan/Index";
 import HRKaryawanCreate from "./pages/hr/karyawan/Create";
 import HRKaryawanEdit from "./pages/hr/karyawan/Edit";
-import KaryawanDashboardPage from "./pages/KaryawanDashboardPage";
+import HRProfile from "./pages/hr/Profile";
+import HRSkillIndex from "./pages/hr/skill/Index";
+import HRSkillCreate from "./pages/hr/skill/Create";
+import HRSkillEdit from "./pages/hr/skill/Edit";
+import KaryawanLayout from "./pages/karyawan/Layout";
+import KaryawanDashboardPage from "./pages/karyawan/Index";
+import KaryawanModulPage from "./pages/karyawan/Modul";
+import KaryawanProfile from "./pages/karyawan/Profile";
 import {
   authApi,
   logApi,
   moduleApi,
   setUnauthorizedHandler,
   userApi,
+  skillApi,
 } from "./services/api";
 
 const emptyRegister = {
@@ -30,9 +40,6 @@ const emptyRegister = {
   email: "",
   password: "",
   confirmPassword: "",
-  role: "Karyawan",
-  divisi: "General",
-  skills: "",
 };
 
 const emptyLogin = {
@@ -40,11 +47,24 @@ const emptyLogin = {
   password: "",
 };
 
+const emptyForgotPassword = {
+  email: "",
+  otp: "",
+  newPassword: "",
+  confirmNewPassword: "",
+};
+
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
 const emptyModule = {
   judul: "",
   deskripsi: "",
+  goalsModule: "",
   linkMateri: "",
-  targetSkills: "",
+  materiFiles: [],
+  existingMateriFiles: [],
+  targetSkills: [],
+  targetDivisions: [],
 };
 
 const parseStoredUser = () => {
@@ -103,8 +123,12 @@ function App() {
   const [activeAuthTab, setActiveAuthTab] = useState("login");
   const [registerForm, setRegisterForm] = useState(emptyRegister);
   const [loginForm, setLoginForm] = useState(emptyLogin);
+  const [forgotPasswordForm, setForgotPasswordForm] =
+    useState(emptyForgotPassword);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState("email");
 
   const [modules, setModules] = useState([]);
+  const [recommendedModules, setRecommendedModules] = useState([]);
   const [logs, setLogs] = useState([]);
   const [users, setUsers] = useState([]);
 
@@ -114,21 +138,37 @@ function App() {
     email: "",
     password: "",
     role: "Karyawan",
+    divisi: "General",
   });
   const [editUserId, setEditUserId] = useState("");
   const [editUserForm, setEditUserForm] = useState({
     nama: "",
     email: "",
     role: "Karyawan",
+    divisi: "",
+    password: "",
+  });
+  const [profileForm, setProfileForm] = useState({
+    nama: "",
+    email: "",
+    divisi: "",
+    role: "Karyawan",
   });
   const [editModuleId, setEditModuleId] = useState("");
   const [editModuleForm, setEditModuleForm] = useState(emptyModule);
 
-  const [skillsInput, setSkillsInput] = useState("");
-  const [createLogModuleId, setCreateLogModuleId] = useState("");
-  const [completeLogId, setCompleteLogId] = useState("");
+  const [skills, setSkills] = useState([]);
+  const [newSkillForm, setNewSkillForm] = useState({ nama: "", deskripsi: "" });
+  const [editSkillId, setEditSkillId] = useState("");
+  const [editSkillForm, setEditSkillForm] = useState({
+    nama: "",
+    deskripsi: "",
+  });
 
-  const [toast, setToast] = useState({ type: "", message: "" });
+  const [selectedModuleForValidation, setSelectedModuleForValidation] =
+    useState(null);
+  const [moduleParticipants, setModuleParticipants] = useState([]);
+
   const [loading, setLoading] = useState(false);
 
   const isFullBleedRoute =
@@ -137,6 +177,7 @@ function App() {
 
   const isAuthenticated = Boolean(token && user);
   const role = user?.role || null;
+  const googleLoginEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const canAccessModules = useMemo(
     () => role === "HR" || role === "Karyawan",
@@ -144,15 +185,7 @@ function App() {
   );
   const canManageLogsHR = role === "HR";
 
-  useEffect(() => {
-    if (!toast.message) return undefined;
-
-    const timer = setTimeout(() => {
-      setToast({ type: "", message: "" });
-    }, 3500);
-
-    return () => clearTimeout(timer);
-  }, [toast]);
+  // SweetAlert2 will handle all notifications and confirmations
 
   const clearAuthData = (message) => {
     setToken("");
@@ -163,15 +196,27 @@ function App() {
     localStorage.removeItem("user");
 
     if (message) {
-      setToast({ type: "error", message });
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: message,
+        confirmButtonText: "OK",
+        width: 420,
+      });
     }
   };
 
   const setAuthData = (authData) => {
     setToken(authData.token);
-    setUser(authData.user);
+    // Normalize user object to always include _id for compatibility
+    const normalizedUser = { ...(authData.user || {}) };
+    if (!normalizedUser._id && normalizedUser.id) {
+      normalizedUser._id = normalizedUser.id;
+    }
+
+    setUser(normalizedUser);
     localStorage.setItem("token", authData.token);
-    localStorage.setItem("user", JSON.stringify(authData.user));
+    localStorage.setItem("user", JSON.stringify(normalizedUser));
     navigate(
       authData.user?.role === "HR" ? "/dashboard/hr" : "/dashboard/karyawan",
     );
@@ -179,11 +224,36 @@ function App() {
 
   const showError = (error, fallbackMessage) => {
     const message = error?.response?.data?.message || fallbackMessage;
-    setToast({ type: "error", message });
+
+    // If account is pending HR approval, show a non-error 'waiting' info alert
+    if (/menunggu persetujuan/i.test(String(message || ""))) {
+      Swal.fire({
+        icon: "info",
+        title: "Menunggu Persetujuan",
+        text: String(message || "").replace(/\s+/g, " "),
+        confirmButtonText: "OK",
+        width: 420,
+      });
+      return;
+    }
+
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: message,
+      confirmButtonText: "OK",
+      width: 420,
+    });
   };
 
   const showSuccess = (message) => {
-    setToast({ type: "success", message });
+    Swal.fire({
+      icon: "success",
+      title: "Sukses",
+      text: message,
+      confirmButtonText: "OK",
+      width: 420,
+    });
   };
 
   useEffect(() => {
@@ -217,6 +287,13 @@ function App() {
     }
   }, [isAuthenticated, location.pathname, navigate]);
 
+  useEffect(() => {
+    if (activeAuthTab !== "forgot-password") {
+      setForgotPasswordStep("email");
+      setForgotPasswordForm(emptyForgotPassword);
+    }
+  }, [activeAuthTab]);
+
   const fetchModules = async () => {
     if (!isAuthenticated || !canAccessModules) return;
 
@@ -228,12 +305,37 @@ function App() {
     }
   };
 
-  const fetchLogs = async () => {
-    if (!isAuthenticated || !canManageLogsHR) return;
+  const fetchRecommendedModules = async () => {
+    if (!isAuthenticated || role !== "Karyawan") {
+      setRecommendedModules([]);
+      return;
+    }
 
     try {
-      const response = await logApi.getAll();
+      const response = await moduleApi.getRecommendedForMe();
+      setRecommendedModules(response.data.data || []);
+    } catch (error) {
+      showError(error, "Gagal mengambil rekomendasi modul");
+    }
+  };
+
+  const fetchLogs = async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      const response = canManageLogsHR
+        ? await logApi.getAll()
+        : await logApi.getMine();
       setLogs(response.data.data || []);
+
+      if (!canManageLogsHR && user?._id) {
+        const meResponse = await userApi.getById(user._id);
+        const latestUser = meResponse.data.data;
+        if (latestUser) {
+          setUser(latestUser);
+          localStorage.setItem("user", JSON.stringify(latestUser));
+        }
+      }
     } catch (error) {
       showError(error, "Gagal mengambil data progress log");
     }
@@ -249,11 +351,35 @@ function App() {
       showError(error, "Gagal mengambil data karyawan");
     }
   };
+  const fetchSkills = async () => {
+    if (!isAuthenticated || role !== "HR") return;
+
+    try {
+      const response = await skillApi.getAll();
+      setSkills(response.data.data || []);
+    } catch (error) {
+      console.error("[App] fetchSkills error", error, error?.response?.data);
+      showError(error, "Gagal mengambil data skill");
+    }
+  };
   useEffect(() => {
     fetchModules();
+    fetchRecommendedModules();
     fetchLogs();
     fetchUsers();
+    fetchSkills();
   }, [isAuthenticated, role]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    setProfileForm({
+      nama: user.nama || "",
+      email: user.email || "",
+      divisi: user.divisi || "",
+      role: user.role || "Karyawan",
+    });
+  }, [user]);
 
   const handleRegister = async (event) => {
     event.preventDefault();
@@ -271,14 +397,16 @@ function App() {
         email: registerForm.email,
         password: registerForm.password,
         role: "Karyawan",
-        divisi: "General",
         skills: [],
       };
 
-      const response = await authApi.register(payload);
-      setAuthData(response.data.data);
-      showSuccess("Registrasi berhasil dan kamu langsung login");
+      await authApi.register(payload);
+      showSuccess(
+        "Registrasi berhasil. Menunggu persetujuan HRD, notifikasi akan dikirim ke email.",
+      );
       setRegisterForm(emptyRegister);
+      setActiveAuthTab("login");
+      setLoginForm((prev) => ({ ...prev, email: payload.email }));
     } catch (error) {
       showError(error, "Registrasi gagal");
     } finally {
@@ -302,23 +430,253 @@ function App() {
     }
   };
 
+  const handleGoogleLogin = async (googleCredentialResponse) => {
+    const credential = googleCredentialResponse?.credential;
+    if (!credential) {
+      showError(null, "Credential Google tidak ditemukan");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await authApi.loginWithGoogle({ credential });
+      setAuthData(response.data.data);
+      showSuccess("Login Google berhasil");
+      setLoginForm(emptyLogin);
+    } catch (error) {
+      showError(error, "Login Google gagal");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    showError(null, "Autentikasi Google gagal. Coba lagi.");
+  };
+
+  const handleRequestForgotPasswordOtp = async (event) => {
+    if (event?.preventDefault) event.preventDefault();
+
+    const email = (forgotPasswordForm.email || "").trim();
+    if (!email) {
+      showError(null, "Email wajib diisi untuk kirim OTP");
+      return;
+    }
+
+    const requestOtpForEmail = async (targetEmail) => {
+      const response = await authApi.requestForgotPasswordOtp({
+        email: targetEmail,
+      });
+      const emailExists = response?.data?.data?.emailExists;
+      return { emailExists };
+    };
+
+    const openOtpVerificationModal = async (targetEmail) => {
+      while (true) {
+        let countdown = OTP_RESEND_COOLDOWN_SECONDS;
+        let countdownInterval = null;
+
+        const otpPrompt = await Swal.fire({
+          title: "Masukkan OTP",
+          text: "OTP sudah dikirim ke email kamu",
+          input: "text",
+          inputLabel: "Kode OTP",
+          inputPlaceholder: "Masukkan 6 digit OTP",
+          inputAttributes: {
+            inputmode: "numeric",
+            maxlength: 6,
+            autocapitalize: "off",
+            autocomplete: "one-time-code",
+          },
+          showCancelButton: true,
+          showDenyButton: true,
+          confirmButtonText: "Verifikasi OTP",
+          cancelButtonText: "Batal",
+          denyButtonText: `Kirim Ulang (${countdown}s)`,
+          width: 420,
+          didOpen: () => {
+            const otpInput = Swal.getInput();
+            if (otpInput) {
+              otpInput.focus();
+              otpInput.addEventListener("input", () => {
+                otpInput.value = otpInput.value.replace(/\D/g, "").slice(0, 6);
+              });
+            }
+
+            const denyButton = Swal.getDenyButton();
+            if (denyButton) {
+              denyButton.disabled = true;
+              countdownInterval = setInterval(() => {
+                countdown -= 1;
+                if (countdown <= 0) {
+                  clearInterval(countdownInterval);
+                  denyButton.disabled = false;
+                  denyButton.textContent = "Kirim Ulang OTP";
+                } else {
+                  denyButton.textContent = `Kirim Ulang (${countdown}s)`;
+                }
+              }, 1000);
+            }
+          },
+          willClose: () => {
+            if (countdownInterval) clearInterval(countdownInterval);
+          },
+          preConfirm: async (otpInput) => {
+            const otp = (otpInput || "").trim();
+            if (!/^\d{6}$/.test(otp)) {
+              Swal.showValidationMessage("OTP harus 6 digit angka");
+              return null;
+            }
+
+            try {
+              await authApi.verifyForgotPasswordOtp({
+                email: targetEmail,
+                otp,
+              });
+              return otp;
+            } catch (error) {
+              const message =
+                error?.response?.data?.message || "OTP tidak valid";
+              Swal.showValidationMessage(message);
+              return null;
+            }
+          },
+        });
+
+        if (otpPrompt.isConfirmed) {
+          setForgotPasswordForm((prev) => ({
+            ...prev,
+            email: targetEmail,
+            otp: otpPrompt.value,
+          }));
+          setForgotPasswordStep("reset");
+          showSuccess("OTP valid, sekarang isi password baru");
+          return;
+        }
+
+        if (otpPrompt.isDenied) {
+          try {
+            const resendResponse = await requestOtpForEmail(targetEmail);
+            if (!resendResponse.emailExists) {
+              showError(null, "Email tidak terdaftar di sistem");
+              return;
+            }
+            continue;
+          } catch (error) {
+            showError(error, "Gagal mengirim ulang OTP");
+            return;
+          }
+        }
+
+        return;
+      }
+    };
+
+    setLoading(true);
+    try {
+      const response = await requestOtpForEmail(email);
+      if (!response.emailExists) {
+        showError(null, "Email tidak terdaftar di sistem");
+        return;
+      }
+    } catch (error) {
+      showError(error, "Gagal mengirim OTP reset password");
+      return;
+    } finally {
+      setLoading(false);
+    }
+
+    await openOtpVerificationModal(email);
+  };
+
+  const handleResetPasswordWithOtp = async (event) => {
+    event.preventDefault();
+
+    const email = (forgotPasswordForm.email || "").trim();
+    const otp = (forgotPasswordForm.otp || "").trim();
+    const newPassword = forgotPasswordForm.newPassword || "";
+    const confirmNewPassword = forgotPasswordForm.confirmNewPassword || "";
+
+    if (!email || !otp || !newPassword || !confirmNewPassword) {
+      showError(null, "Lengkapi email, OTP, dan password baru");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      showError(null, "Password baru dan konfirmasi password tidak cocok");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await authApi.resetPasswordWithOtp({
+        email,
+        otp,
+        newPassword,
+      });
+
+      showSuccess(
+        response?.data?.message ||
+          "Password berhasil direset, silakan login kembali",
+      );
+
+      setForgotPasswordForm(emptyForgotPassword);
+      setForgotPasswordStep("email");
+      setActiveAuthTab("login");
+      setLoginForm((prev) => ({ ...prev, email, password: "" }));
+    } catch (error) {
+      showError(error, "Gagal reset password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToForgotEmailStep = () => {
+    setForgotPasswordForm((prev) => ({
+      ...prev,
+      otp: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    }));
+    setForgotPasswordStep("email");
+  };
+
   const handleCreateModule = async (event) => {
     event.preventDefault();
+
+    if (
+      !(newModuleForm.linkMateri || "").trim() &&
+      !(newModuleForm.materiFiles || []).length
+    ) {
+      showError(null, "Isi Link Materi atau upload minimal 1 file materi");
+      return;
+    }
+
     setLoading(true);
-
     try {
-      const payload = {
-        ...newModuleForm,
-        targetSkills: newModuleForm.targetSkills
-          .split(",")
-          .map((skill) => skill.trim())
-          .filter(Boolean),
-      };
+      const formData = new FormData();
+      formData.append("judul", newModuleForm.judul || "");
+      formData.append("deskripsi", newModuleForm.deskripsi || "");
+      formData.append("goalsModule", newModuleForm.goalsModule || "");
+      formData.append("linkMateri", newModuleForm.linkMateri || "");
+      formData.append(
+        "targetSkills",
+        JSON.stringify(newModuleForm.targetSkills || []),
+      );
+      formData.append(
+        "targetDivisions",
+        JSON.stringify(newModuleForm.targetDivisions || []),
+      );
 
-      await moduleApi.create(payload);
+      (newModuleForm.materiFiles || []).forEach((file) => {
+        formData.append("materiFiles", file);
+      });
+
+      await moduleApi.create(formData);
       showSuccess("Modul berhasil dibuat");
       setNewModuleForm(emptyModule);
       await fetchModules();
+      navigate("/dashboard/hr/modul");
     } catch (error) {
       showError(error, "Gagal membuat modul");
     } finally {
@@ -329,34 +687,50 @@ function App() {
   const handleUpdateModule = async (event) => {
     event.preventDefault();
     if (!editModuleId.trim()) {
-      setToast({ type: "error", message: "Isi Module ID terlebih dahulu" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Isi Module ID terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
+      return;
+    }
+
+    if (
+      !(editModuleForm.linkMateri || "").trim() &&
+      !(editModuleForm.materiFiles || []).length &&
+      !(editModuleForm.existingMateriFiles || []).length
+    ) {
+      showError(null, "Isi Link Materi atau upload minimal 1 file materi");
       return;
     }
 
     setLoading(true);
 
     try {
-      const payload = {
-        judul: editModuleForm.judul,
-        deskripsi: editModuleForm.deskripsi,
-        linkMateri: editModuleForm.linkMateri,
-        targetSkills: editModuleForm.targetSkills
-          .split(",")
-          .map((skill) => skill.trim())
-          .filter(Boolean),
-      };
+      const formData = new FormData();
+      formData.append("judul", editModuleForm.judul || "");
+      formData.append("deskripsi", editModuleForm.deskripsi || "");
+      formData.append("goalsModule", editModuleForm.goalsModule || "");
+      formData.append("linkMateri", editModuleForm.linkMateri || "");
+      formData.append(
+        "targetSkills",
+        JSON.stringify(editModuleForm.targetSkills || []),
+      );
+      formData.append(
+        "targetDivisions",
+        JSON.stringify(editModuleForm.targetDivisions || []),
+      );
 
-      Object.keys(payload).forEach((key) => {
-        if (Array.isArray(payload[key])) {
-          if (payload[key].length === 0) delete payload[key];
-        } else if (!payload[key]) {
-          delete payload[key];
-        }
+      (editModuleForm.materiFiles || []).forEach((file) => {
+        formData.append("materiFiles", file);
       });
 
-      await moduleApi.update(editModuleId, payload);
+      await moduleApi.update(editModuleId, formData);
       showSuccess("Modul berhasil diperbarui");
       await fetchModules();
+      navigate("/dashboard/hr/modul");
     } catch (error) {
       showError(error, "Gagal memperbarui modul");
     } finally {
@@ -365,7 +739,15 @@ function App() {
   };
 
   const handleDeleteModule = async (moduleId) => {
-    if (!window.confirm("Yakin ingin menghapus modul ini?")) return;
+    const result = await Swal.fire({
+      title: "Yakin ingin menghapus modul ini?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Tidak",
+      width: 420,
+    });
+    if (!result.isConfirmed) return;
 
     setLoading(true);
     try {
@@ -379,75 +761,77 @@ function App() {
     }
   };
 
-  const handleUpdateSkills = async (event) => {
-    event.preventDefault();
+  const handleEnrollModule = async (moduleId) => {
     setLoading(true);
-
     try {
-      const skills = skillsInput
-        .split(",")
-        .map((skill) => skill.trim())
-        .filter(Boolean);
-
-      const response = await userApi.updateProfileSkills(skills);
-      const nextUser = { ...user, ...response.data.data };
-      setUser(nextUser);
-      localStorage.setItem("user", JSON.stringify(nextUser));
-      showSuccess("Skills profile berhasil diperbarui");
+      await logApi.create(moduleId);
+      showSuccess("Berhasil daftar modul");
+      await fetchLogs();
     } catch (error) {
-      showError(error, "Gagal memperbarui skills");
+      showError(error, "Gagal mendaftar modul");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateLog = async (event) => {
-    event.preventDefault();
+  const handleSubmitTask = async (logId, submissionData) => {
+    const link = (submissionData?.submissionLink || "").trim();
+    const files = submissionData?.files || [];
 
-    if (!createLogModuleId.trim()) {
-      setToast({ type: "error", message: "Pilih module terlebih dahulu" });
+    if (!link && !files.length) {
+      showError(null, "Isi link tugas atau upload minimal 1 file tugas");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await logApi.create(createLogModuleId);
-      const newLog = response.data.data;
-      setLogs((prev) => [newLog, ...prev]);
-      setCompleteLogId(newLog?._id || "");
-      showSuccess("Progress log berhasil dibuat");
-      await fetchModules();
+      const formData = new FormData();
+      formData.append("submissionLink", link);
+      files.forEach((file) => formData.append("submissionFiles", file));
+
+      await logApi.submitTask(logId, formData);
+      showSuccess("Tugas berhasil disubmit, menunggu validasi HR");
+      await fetchLogs();
     } catch (error) {
-      showError(error, "Gagal membuat progress log");
+      showError(error, "Gagal submit tugas");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCompleteLog = async (event) => {
-    event.preventDefault();
-    if (!completeLogId.trim()) {
-      setToast({ type: "error", message: "Isi Log ID terlebih dahulu" });
-      return;
-    }
-
+  const fetchModuleParticipants = async (moduleId) => {
     setLoading(true);
     try {
-      const response = await logApi.complete(completeLogId);
-      const updatedLog = response.data.data;
-      setLogs((prev) => {
-        const exists = prev.some((item) => item._id === updatedLog._id);
-        if (exists) {
-          return prev.map((item) =>
-            item._id === updatedLog._id ? updatedLog : item,
-          );
-        }
-        return [updatedLog, ...prev];
-      });
-      showSuccess("Status log berhasil diubah ke Selesai");
-      await fetchModules();
+      const response = await logApi.getByModule(moduleId);
+      setModuleParticipants(response.data.data || []);
     } catch (error) {
-      showError(error, "Gagal mengubah status log");
+      showError(error, "Gagal mengambil peserta modul");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenModuleParticipants = async (moduleItem) => {
+    setSelectedModuleForValidation(moduleItem);
+    await fetchModuleParticipants(moduleItem._id);
+    navigate("/dashboard/hr/modul/participants");
+  };
+
+  const handleValidateSubmission = async (logId, action, feedback) => {
+    setLoading(true);
+    try {
+      await logApi.validate(logId, { action, feedback });
+      showSuccess(
+        action === "approve"
+          ? "Karyawan dinyatakan lulus"
+          : "Submission dikembalikan ke karyawan",
+      );
+      if (selectedModuleForValidation?._id) {
+        await fetchModuleParticipants(selectedModuleForValidation._id);
+      }
+      await fetchLogs();
+    } catch (error) {
+      showError(error, "Gagal memvalidasi submission");
     } finally {
       setLoading(false);
     }
@@ -460,10 +844,111 @@ function App() {
     try {
       const response = await userApi.create(newUserForm);
       showSuccess("Karyawan berhasil ditambahkan");
-      setNewUserForm({ nama: "", email: "", password: "", role: "Karyawan" });
+      setNewUserForm({
+        nama: "",
+        email: "",
+        password: "",
+        role: "Karyawan",
+        divisi: "General",
+      });
       await fetchUsers();
+      navigate("/dashboard/hr/karyawan");
     } catch (error) {
       showError(error, "Gagal menambahkan karyawan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSkill = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+
+    try {
+      const payload = {
+        nama: newSkillForm.nama,
+        deskripsi: newSkillForm.deskripsi,
+      };
+
+      await skillApi.create(payload);
+      showSuccess("Skill berhasil dibuat");
+      setNewSkillForm({ nama: "", deskripsi: "" });
+      await fetchSkills();
+      navigate("/dashboard/hr/skills");
+    } catch (error) {
+      console.error(
+        "[App] handleCreateSkill error",
+        error,
+        error?.response?.data,
+      );
+      showError(error, "Gagal membuat skill");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateSkill = async (event) => {
+    event.preventDefault();
+    if (!editSkillId.trim()) {
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Pilih skill terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        nama: editSkillForm.nama,
+        deskripsi: editSkillForm.deskripsi,
+      };
+      const response = await skillApi.update(editSkillId, payload);
+      console.log("[App] handleUpdateSkill response", response?.data);
+      showSuccess("Skill berhasil diperbarui");
+      setEditSkillId("");
+      setEditSkillForm({ nama: "", deskripsi: "" });
+      await fetchSkills();
+      navigate("/dashboard/hr/skills");
+    } catch (error) {
+      console.error(
+        "[App] handleUpdateSkill error",
+        error,
+        error?.response?.data,
+      );
+      showError(error, "Gagal memperbarui skill");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSkill = async (skillId) => {
+    const result = await Swal.fire({
+      title: "Yakin ingin menghapus skill ini?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Tidak",
+      width: 420,
+    });
+    if (!result.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      const response = await skillApi.remove(skillId);
+      console.log("[App] handleDeleteSkill response", response?.data);
+      showSuccess("Skill berhasil dihapus");
+      await fetchSkills();
+    } catch (error) {
+      console.error(
+        "[App] handleDeleteSkill error",
+        error,
+        error?.response?.data,
+      );
+      showError(error, "Gagal menghapus skill");
     } finally {
       setLoading(false);
     }
@@ -472,7 +957,13 @@ function App() {
   const handleUpdateUser = async (event) => {
     event.preventDefault();
     if (!editUserId.trim()) {
-      setToast({ type: "error", message: "Pilih karyawan terlebih dahulu" });
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Pilih karyawan terlebih dahulu",
+        confirmButtonText: "OK",
+        width: 420,
+      });
       return;
     }
 
@@ -483,12 +974,24 @@ function App() {
         nama: editUserForm.nama,
         email: editUserForm.email,
         role: editUserForm.role,
+        divisi: editUserForm.divisi,
       };
+      // If HR provided a new password, include it in the update payload
+      if (editUserForm.password && editUserForm.password.trim() !== "") {
+        payload.password = editUserForm.password;
+      }
       await userApi.update(editUserId, payload);
       showSuccess("Data karyawan berhasil diperbarui");
       setEditUserId("");
-      setEditUserForm({ nama: "", email: "", role: "Karyawan" });
+      setEditUserForm({
+        nama: "",
+        email: "",
+        role: "Karyawan",
+        divisi: "",
+        password: "",
+      });
       await fetchUsers();
+      navigate("/dashboard/hr/karyawan");
     } catch (error) {
       showError(error, "Gagal memperbarui karyawan");
     } finally {
@@ -496,8 +999,123 @@ function App() {
     }
   };
 
+  const handleApproveRegistration = async (userItem) => {
+    const decision = await Swal.fire({
+      title: `Approve registrasi ${userItem?.nama || "karyawan"}?`,
+      input: "text",
+      inputLabel: "Divisi Karyawan",
+      inputPlaceholder: "Contoh: Engineering",
+      showCancelButton: true,
+      confirmButtonText: "Approve",
+      cancelButtonText: "Batal",
+      width: 420,
+      inputValidator: (value) => {
+        if (!String(value || "").trim()) {
+          return "Divisi wajib diisi saat approve";
+        }
+        return null;
+      },
+    });
+
+    if (!decision.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await userApi.decideRegistration(userItem._id, {
+        status: "approved",
+        divisi: String(decision.value || "").trim(),
+      });
+      showSuccess(
+        "Registrasi berhasil disetujui dan notifikasi email terkirim",
+      );
+      await fetchUsers();
+    } catch (error) {
+      showError(error, "Gagal approve registrasi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectRegistration = async (userItem) => {
+    const decision = await Swal.fire({
+      title: `Tolak registrasi ${userItem?.nama || "karyawan"}?`,
+      input: "textarea",
+      inputLabel: "Alasan (opsional)",
+      inputPlaceholder: "Tulis alasan penolakan",
+      showCancelButton: true,
+      confirmButtonText: "Tolak",
+      cancelButtonText: "Batal",
+      width: 420,
+    });
+
+    if (!decision.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await userApi.decideRegistration(userItem._id, {
+        status: "rejected",
+        reason: String(decision.value || "").trim(),
+      });
+      showSuccess("Registrasi ditolak dan notifikasi email terkirim");
+      await fetchUsers();
+    } catch (error) {
+      showError(error, "Gagal menolak registrasi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProfile = async (event) => {
+    event.preventDefault();
+    if (!user?._id) {
+      showError(null, "User tidak ditemukan");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        nama: profileForm.nama,
+        email: profileForm.email,
+        divisi: profileForm.divisi,
+        role: role === "Karyawan" ? "Karyawan" : profileForm.role,
+      };
+
+      const response = await userApi.update(user._id, payload);
+      const updatedUser = response.data.data;
+      // normalize id field if backend returns `id` instead of `_id`
+      const normalized = { ...(updatedUser || {}) };
+      if (!normalized._id && normalized.id) normalized._id = normalized.id;
+
+      setUser(normalized);
+      localStorage.setItem("user", JSON.stringify(normalized));
+      // update profile form so UI reflects latest data immediately
+      setProfileForm({
+        nama: normalized.nama || "",
+        email: normalized.email || "",
+        divisi: normalized.divisi || "",
+        role: normalized.role || "Karyawan",
+      });
+      showSuccess("Profil berhasil diperbarui");
+      await fetchRecommendedModules();
+    } catch (error) {
+      showError(error, "Gagal memperbarui profil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Yakin ingin menghapus karyawan ini?")) return;
+    const result = await Swal.fire({
+      title: "Yakin ingin menghapus karyawan ini?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya",
+      cancelButtonText: "Tidak",
+      width: 420,
+    });
+    if (!result.isConfirmed) return;
 
     setLoading(true);
     try {
@@ -511,24 +1129,7 @@ function App() {
     }
   };
 
-  const renderKaryawanDashboard = () => (
-    <KaryawanDashboardPage
-      user={user}
-      loading={loading}
-      modules={modules}
-      logs={logs}
-      onLogout={clearAuthData}
-      skillsInput={skillsInput}
-      setSkillsInput={setSkillsInput}
-      onUpdateSkills={handleUpdateSkills}
-      createLogModuleId={createLogModuleId}
-      setCreateLogModuleId={setCreateLogModuleId}
-      completeLogId={completeLogId}
-      setCompleteLogId={setCompleteLogId}
-      onCreateLog={handleCreateLog}
-      onCompleteLog={handleCompleteLog}
-    />
-  );
+  const renderKaryawanDashboard = () => <KaryawanDashboardPage logs={logs} />;
 
   return (
     <main
@@ -538,11 +1139,7 @@ function App() {
           : "bg-slate-900 px-4 py-6 text-slate-100 sm:px-6 lg:px-8"
       }`}
     >
-      <Toast
-        type={toast.type}
-        message={toast.message}
-        onClose={() => setToast({ type: "", message: "" })}
-      />
+      {/* Notifications handled by SweetAlert2 */}
 
       <div
         className={`mx-auto w-full ${isFullBleedRoute ? "max-w-none" : "max-w-7xl"}`}
@@ -580,8 +1177,17 @@ function App() {
                   setRegisterForm={setRegisterForm}
                   loginForm={loginForm}
                   setLoginForm={setLoginForm}
+                  forgotPasswordForm={forgotPasswordForm}
+                  setForgotPasswordForm={setForgotPasswordForm}
+                  forgotPasswordStep={forgotPasswordStep}
+                  onBackToEmailStep={handleBackToForgotEmailStep}
                   onRegister={handleRegister}
                   onLogin={handleLogin}
+                  onGoogleLoginSuccess={handleGoogleLogin}
+                  onGoogleLoginError={handleGoogleLoginError}
+                  googleLoginEnabled={googleLoginEnabled}
+                  onRequestOtp={handleRequestForgotPasswordOtp}
+                  onResetPassword={handleResetPasswordWithOtp}
                 />
               )
             }
@@ -625,6 +1231,26 @@ function App() {
                     onDeleteModule={handleDeleteModule}
                     setEditModuleId={setEditModuleId}
                     setEditModuleForm={setEditModuleForm}
+                    onOpenParticipants={handleOpenModuleParticipants}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/modul/participants"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRModulParticipants
+                    selectedModule={selectedModuleForValidation}
+                    participants={moduleParticipants}
+                    onValidateSubmission={handleValidateSubmission}
+                    loading={loading}
                   />
                 </HRLayout>
               </RequireRole>
@@ -644,6 +1270,7 @@ function App() {
                     setNewModuleForm={setNewModuleForm}
                     onCreateModule={handleCreateModule}
                     loading={loading}
+                    skills={skills}
                   />
                 </HRLayout>
               </RequireRole>
@@ -664,6 +1291,7 @@ function App() {
                     setEditModuleForm={setEditModuleForm}
                     onUpdateModule={handleUpdateModule}
                     loading={loading}
+                    skills={skills}
                   />
                 </HRLayout>
               </RequireRole>
@@ -681,6 +1309,8 @@ function App() {
                   <HRKaryawanIndex
                     users={users}
                     onDeleteUser={handleDeleteUser}
+                    onApproveRegistration={handleApproveRegistration}
+                    onRejectRegistration={handleRejectRegistration}
                     setEditUserId={setEditUserId}
                     setEditUserForm={setEditUserForm}
                   />
@@ -728,7 +1358,7 @@ function App() {
             }
           />
           <Route
-            path="/dashboard/hr/modul/create"
+            path="/dashboard/hr/skills"
             element={
               <RequireRole
                 isAuthenticated={isAuthenticated}
@@ -736,10 +1366,29 @@ function App() {
                 allowedRoles={["HR"]}
               >
                 <HRLayout user={user} onLogout={clearAuthData}>
-                  <HRModulCreate
-                    newModuleForm={newModuleForm}
-                    setNewModuleForm={setNewModuleForm}
-                    onCreateModule={handleCreateModule}
+                  <HRSkillIndex
+                    skills={skills}
+                    onDeleteSkill={handleDeleteSkill}
+                    setEditSkillId={setEditSkillId}
+                    setEditSkillForm={setEditSkillForm}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/skills/create"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRSkillCreate
+                    newSkillForm={newSkillForm}
+                    setNewSkillForm={setNewSkillForm}
+                    onCreateSkill={handleCreateSkill}
                     loading={loading}
                   />
                 </HRLayout>
@@ -747,7 +1396,7 @@ function App() {
             }
           />
           <Route
-            path="/dashboard/hr/modul/edit"
+            path="/dashboard/hr/skills/edit"
             element={
               <RequireRole
                 isAuthenticated={isAuthenticated}
@@ -755,11 +1404,30 @@ function App() {
                 allowedRoles={["HR"]}
               >
                 <HRLayout user={user} onLogout={clearAuthData}>
-                  <HRModulEdit
-                    editModuleId={editModuleId}
-                    editModuleForm={editModuleForm}
-                    setEditModuleForm={setEditModuleForm}
-                    onUpdateModule={handleUpdateModule}
+                  <HRSkillEdit
+                    editSkillForm={editSkillForm}
+                    setEditSkillForm={setEditSkillForm}
+                    onUpdateSkill={handleUpdateSkill}
+                    loading={loading}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/profile"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRProfile
+                    user={user}
+                    editUserForm={profileForm}
+                    setEditUserForm={setProfileForm}
+                    onUpdateUser={handleUpdateProfile}
                     loading={loading}
                   />
                 </HRLayout>
@@ -774,7 +1442,50 @@ function App() {
                 userRole={role}
                 allowedRoles={["Karyawan"]}
               >
-                {renderKaryawanDashboard()}
+                <KaryawanLayout user={user} onLogout={clearAuthData}>
+                  {renderKaryawanDashboard()}
+                </KaryawanLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/karyawan/modul"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["Karyawan"]}
+              >
+                <KaryawanLayout user={user} onLogout={clearAuthData}>
+                  <KaryawanModulPage
+                    modules={modules}
+                    recommendedModules={recommendedModules}
+                    logs={logs}
+                    loading={loading}
+                    onEnrollModule={handleEnrollModule}
+                    onSubmitTask={handleSubmitTask}
+                  />
+                </KaryawanLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/karyawan/profile"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["Karyawan"]}
+              >
+                <KaryawanLayout user={user} onLogout={clearAuthData}>
+                  <KaryawanProfile
+                    user={user}
+                    profileForm={profileForm}
+                    setProfileForm={setProfileForm}
+                    onUpdateProfile={handleUpdateProfile}
+                    loading={loading}
+                  />
+                </KaryawanLayout>
               </RequireRole>
             }
           />

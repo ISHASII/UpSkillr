@@ -12,12 +12,29 @@ const trainingModuleSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    linkMateri: {
+    goalsModule: {
       type: String,
       required: true,
       trim: true,
     },
+    linkMateri: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    materiFiles: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     targetSkills: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Skill",
+      },
+    ],
+    targetDivisions: [
       {
         type: String,
         trim: true,

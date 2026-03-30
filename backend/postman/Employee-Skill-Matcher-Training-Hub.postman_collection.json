@@ -1,13 +1,13 @@
 {
   "info": {
-    "name": "Employee Skill Matcher & Training Hub API",
+    "name": "Employee Skill Matcher \u0026 Training Hub API",
     "_postman_id": "5f778ab4-9de0-49ce-8d9f-0d1d1c4d6b02",
-    "description": "Collection untuk testing endpoint auth, role HR, dan role Karyawan.",
+    "description": "Collection testing API terbaru. Flow auth saat ini: role HR tidak perlu approval (langsung approved), role Karyawan wajib approval HRD (pending -> approved/rejected). Urutan aman: 00 Health Check -> 01 Register HR -> 02 Login HR -> 03 Register Karyawan -> 04 Login Karyawan (expected pending) -> 05 Get Pending Registrations -> 06 Approve Karyawan -> 07 Login Karyawan (after approval).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Health Check",
+      "name": "00 - Health Check",
       "request": {
         "method": "GET",
         "header": [],
@@ -22,49 +22,7 @@
       "name": "Auth",
       "item": [
         {
-          "name": "Register HR",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nama\": \"Admin HR\",\n  \"email\": \"hr@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"HR\",\n  \"divisi\": \"Human Resource\",\n  \"skills\": [\"Leadership\", \"Recruitment\"]\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "register"]
-            }
-          }
-        },
-        {
-          "name": "Register Karyawan",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nama\": \"Karyawan Satu\",\n  \"email\": \"karyawan@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"Karyawan\",\n  \"divisi\": \"Engineering\",\n  \"skills\": [\"Node.js\", \"MongoDB\"]\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "register"]
-            }
-          }
-        },
-        {
-          "name": "Login HR",
+          "name": "01 - Register HR",
           "event": [
             {
               "listen": "test",
@@ -72,8 +30,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json?.data?.token) {",
-                  "  pm.collectionVariables.set('hrToken', json.data.token);",
+                  "if (json?.data?.user?.email) {",
+                  "  pm.collectionVariables.set('hrEmail', json.data.user.email);",
                   "}"
                 ]
               }
@@ -89,7 +47,78 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"hr@example.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"nama\": \"Admin HR\",\n  \"email\": \"{{hrEmail}}\",\n  \"password\": \"{{hrPassword}}\",\n  \"role\": \"HRD\",\n  \"divisi\": \"Human Resource\",\n  \"skills\": [\"Leadership\", \"Recruitment\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "03 - Register Karyawan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.user?.id) {",
+                  "  pm.collectionVariables.set('pendingUserId', json.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Karyawan Satu\",\n  \"email\": \"{{karyawanEmail}}\",\n  \"password\": \"{{karyawanPassword}}\",\n  \"role\": \"Karyawan\",\n  \"skills\": [\"Node.js\", \"MongoDB\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "02 - Login HR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.token) {",
+                  "  pm.collectionVariables.set(\u0027hrToken\u0027, json.data.token);",
+                  "  if (json?.data?.user?.id) pm.collectionVariables.set(\u0027hrUserId\u0027, json.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{hrEmail}}\",\n  \"password\": \"{{hrPassword}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
@@ -99,7 +128,64 @@
           }
         },
         {
-          "name": "Login Karyawan",
+          "name": "02B - Login Google",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"{{googleCredential}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google"]
+            }
+          }
+        },
+        {
+          "name": "04 - Login Karyawan (Expected Pending/Rejected before approval)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.token) {",
+                  "  pm.collectionVariables.set(\u0027karyawanToken\u0027, json.data.token);",
+                  "  if (json?.data?.user?.id) pm.collectionVariables.set(\u0027karyawanUserId\u0027, json.data.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{karyawanEmail}}\",\n  \"password\": \"{{karyawanPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "07 - Login Karyawan (After HR Approval)",
           "event": [
             {
               "listen": "test",
@@ -109,6 +195,7 @@
                   "const json = pm.response.json();",
                   "if (json?.data?.token) {",
                   "  pm.collectionVariables.set('karyawanToken', json.data.token);",
+                  "  if (json?.data?.user?.id) pm.collectionVariables.set('karyawanUserId', json.data.user.id);",
                   "}"
                 ]
               }
@@ -124,12 +211,54 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"karyawan@example.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"email\": \"{{karyawanEmail}}\",\n  \"password\": \"{{karyawanPassword}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "08 - Forgot Password - Request OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{forgotEmail}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password/request-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password", "request-otp"]
+            }
+          }
+        },
+        {
+          "name": "09 - Forgot Password - Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{forgotEmail}}\",\n  \"otp\": \"{{forgotOtp}}\",\n  \"newPassword\": \"passwordBaru123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password/reset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password", "reset"]
             }
           }
         }
@@ -139,7 +268,7 @@
       "name": "Modules (Role Based)",
       "item": [
         {
-          "name": "HR - Create Module",
+          "name": "M01 - HR - Create Module",
           "request": {
             "method": "POST",
             "header": [
@@ -154,7 +283,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"judul\": \"Advanced Node.js\",\n  \"deskripsi\": \"Pendalaman Node.js untuk backend engineer\",\n  \"linkMateri\": \"https://example.com/node-advanced\",\n  \"targetSkills\": [\"Node.js\", \"System Design\"]\n}"
+              "raw": "{\n  \"judul\": \"Advanced Node.js\",\n  \"deskripsi\": \"Pendalaman Node.js untuk backend engineer\",\n  \"goalsModule\": \"Mampu membangun backend production-ready\",\n  \"linkMateri\": \"https://example.com/node-advanced\",\n  \"targetDivisions\": [\"Engineering\"],\n  \"targetSkills\": [\"{{skillId}}\"]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/modules",
@@ -164,7 +293,7 @@
           }
         },
         {
-          "name": "HR/Karyawan - Get All Modules",
+          "name": "M02 - HR/Karyawan - Get All Modules",
           "request": {
             "method": "GET",
             "header": [
@@ -181,7 +310,7 @@
           }
         },
         {
-          "name": "HR - Update Module",
+          "name": "M03 - HR - Update Module",
           "request": {
             "method": "PUT",
             "header": [
@@ -196,7 +325,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"judul\": \"Advanced Node.js Updated\",\n  \"deskripsi\": \"Materi terbaru backend engineer\"\n}"
+              "raw": "{\n  \"judul\": \"Advanced Node.js Updated\",\n  \"deskripsi\": \"Materi terbaru backend engineer\",\n  \"goalsModule\": \"Mampu optimasi API Node.js\",\n  \"targetDivisions\": [\"Engineering\", \"Backend\"],\n  \"targetSkills\": [\"{{skillId}}\"]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/modules/{{moduleId}}",
@@ -206,7 +335,7 @@
           }
         },
         {
-          "name": "HR - Delete Module",
+          "name": "M04 - HR - Delete Module",
           "request": {
             "method": "DELETE",
             "header": [
@@ -221,6 +350,112 @@
               "path": ["api", "modules", "{{moduleId}}"]
             }
           }
+        },
+        {
+          "name": "M05 - Karyawan - Get Recommended Modules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/modules/recommendations/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "modules", "recommendations", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Skills (Role Based)",
+      "item": [
+        {
+          "name": "S01 - HR - Create Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"JavaScript\",\n  \"deskripsi\": \"Bahasa scripting utama untuk web\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "skills"]
+            }
+          }
+        },
+        {
+          "name": "S02 - HR/Karyawan - Get All Skills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "skills"]
+            }
+          }
+        },
+        {
+          "name": "S03 - HR - Update Skill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"JavaScript Lanjutan\",\n  \"deskripsi\": \"ESNext dan pattern lanjutan\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/skills/{{skillId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "skills", "{{skillId}}"]
+            }
+          }
+        },
+        {
+          "name": "S04 - HR - Delete Skill",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/skills/{{skillId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "skills", "{{skillId}}"]
+            }
+          }
         }
       ]
     },
@@ -228,7 +463,32 @@
       "name": "Users (Role Karyawan)",
       "item": [
         {
-          "name": "Karyawan - Update Profile Skills",
+          "name": "K01 - Karyawan - Update Profile (Nama/Email/Divisi)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Karyawan Update\",\n  \"email\": \"{{karyawanEmail}}\",\n  \"divisi\": \"Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{karyawanUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{karyawanUserId}}"]
+            }
+          }
+        },
+        {
+          "name": "K02 - Karyawan - Update Profile Skills",
           "request": {
             "method": "PUT",
             "header": [
@@ -255,10 +515,183 @@
       ]
     },
     {
+      "name": "Users (Role HR)",
+      "item": [
+        {
+          "name": "H01 - HR - Update Profile (Self)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Admin HR Update\",\n  \"email\": \"{{hrEmail}}\",\n  \"divisi\": \"Human Resource\",\n  \"skills\": [\"Leadership\", \"Recruitment\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{hrUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{hrUserId}}"]
+            }
+          }
+        },
+        {
+          "name": "05 - HR - Get Pending Registrations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (Array.isArray(json?.data) && json.data.length > 0) {",
+                  "  pm.collectionVariables.set('pendingUserId', json.data[0]._id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/registrations/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "registrations", "pending"]
+            }
+          }
+        },
+        {
+          "name": "06 - HR - Approve Karyawan Registration",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"divisi\": \"Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/registrations/{{pendingUserId}}/decision",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "users",
+                "registrations",
+                "{{pendingUserId}}",
+                "decision"
+              ]
+            }
+          }
+        },
+        {
+          "name": "06B - HR - Reject Karyawan Registration",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"rejected\",\n  \"reason\": \"Data belum lengkap\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/registrations/{{pendingUserId}}/decision",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "users",
+                "registrations",
+                "{{pendingUserId}}",
+                "decision"
+              ]
+            }
+          }
+        },
+        {
+          "name": "H02 - HR - Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Karyawan Baru\",\n  \"email\": \"baru@example.com\",\n  \"password\": \"123456\",\n  \"role\": \"Karyawan\",\n  \"divisi\": \"General\",\n  \"skills\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "H03 - HR - Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama\": \"Nama Baru\",\n  \"email\": \"update@example.com\",\n  \"role\": \"Karyawan\",\n  \"divisi\": \"General\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Logs (Role Based)",
       "item": [
         {
-          "name": "Karyawan - Create Log",
+          "name": "L01 - Karyawan - Create Log",
           "request": {
             "method": "POST",
             "header": [
@@ -283,7 +716,7 @@
           }
         },
         {
-          "name": "Karyawan - Update Log Status to Selesai",
+          "name": "L02 - Karyawan - Update Log Status to Selesai",
           "request": {
             "method": "PUT",
             "header": [
@@ -308,7 +741,7 @@
           }
         },
         {
-          "name": "HR - Get All Logs",
+          "name": "L03 - HR - Get All Logs",
           "request": {
             "method": "GET",
             "header": [
@@ -325,6 +758,219 @@
           }
         }
       ]
+    },
+    {
+      "name": "Training Flow v2",
+      "item": [
+        {
+          "name": "T01 - HR - Create Module (Goals + Link/File)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "judul",
+                  "value": "Modul React Lanjutan",
+                  "type": "text"
+                },
+                {
+                  "key": "deskripsi",
+                  "value": "Pendalaman React",
+                  "type": "text"
+                },
+                {
+                  "key": "goalsModule",
+                  "value": "Menyelesaikan project",
+                  "type": "text"
+                },
+                {
+                  "key": "targetSkills",
+                  "value": "[\"{{skillId}}\"]",
+                  "type": "text"
+                },
+                {
+                  "key": "targetDivisions",
+                  "value": "[\"Engineering\"]",
+                  "type": "text"
+                },
+                {
+                  "key": "linkMateri",
+                  "value": "https://example.com/materi-react",
+                  "type": "text"
+                },
+                {
+                  "key": "materiFiles",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/modules",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "modules"]
+            }
+          }
+        },
+        {
+          "name": "T02 - Karyawan - Enroll Module",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"module_id\": \"{{moduleId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs"]
+            }
+          }
+        },
+        {
+          "name": "T03 - Karyawan - Submit Task (Link/File)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "submissionLink",
+                  "value": "https://drive.google.com/my-task",
+                  "type": "text"
+                },
+                {
+                  "key": "submissionFiles",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/logs/{{logId}}/submission",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs", "{{logId}}", "submission"]
+            }
+          }
+        },
+        {
+          "name": "T04 - HR - Validate Submission Approve",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"feedback\": \"Sesuai requirement, selamat lulus\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/logs/{{logId}}/validation",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs", "{{logId}}", "validation"]
+            }
+          }
+        },
+        {
+          "name": "T05 - HR - Validate Submission Reject",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"reject\",\n  \"feedback\": \"Perbaiki sesuai catatan\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/logs/{{logId}}/validation",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs", "{{logId}}", "validation"]
+            }
+          }
+        },
+        {
+          "name": "T06 - HR - List Participants By Module",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hrToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/logs/module/{{moduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs", "module", "{{moduleId}}"]
+            }
+          }
+        },
+        {
+          "name": "T07 - Karyawan - Get My Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{karyawanToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/logs/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "logs", "me"]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -337,7 +983,35 @@
       "value": ""
     },
     {
+      "key": "hrEmail",
+      "value": "hr@example.com"
+    },
+    {
+      "key": "hrPassword",
+      "value": "123456"
+    },
+    {
       "key": "karyawanToken",
+      "value": ""
+    },
+    {
+      "key": "hrUserId",
+      "value": ""
+    },
+    {
+      "key": "karyawanUserId",
+      "value": ""
+    },
+    {
+      "key": "karyawanEmail",
+      "value": "karyawan@example.com"
+    },
+    {
+      "key": "karyawanPassword",
+      "value": "123456"
+    },
+    {
+      "key": "pendingUserId",
       "value": ""
     },
     {
@@ -345,7 +1019,27 @@
       "value": ""
     },
     {
+      "key": "skillId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
       "key": "logId",
+      "value": ""
+    },
+    {
+      "key": "forgotEmail",
+      "value": "{{karyawanEmail}}"
+    },
+    {
+      "key": "forgotOtp",
+      "value": ""
+    },
+    {
+      "key": "googleCredential",
       "value": ""
     }
   ]
