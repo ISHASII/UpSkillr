@@ -44,6 +44,12 @@ api.interceptors.response.use(
 export const authApi = {
   register: (payload) => api.post("/api/auth/register", payload),
   login: (payload) => api.post("/api/auth/login", payload),
+  requestForgotPasswordOtp: (payload) =>
+    api.post("/api/auth/forgot-password/request-otp", payload),
+  verifyForgotPasswordOtp: (payload) =>
+    api.post("/api/auth/forgot-password/verify-otp", payload),
+  resetPasswordWithOtp: (payload) =>
+    api.post("/api/auth/forgot-password/reset", payload),
 };
 
 export const moduleApi = {
@@ -72,8 +78,11 @@ export const skillApi = {
 
 export const logApi = {
   getAll: () => api.get("/api/logs"),
+  getMine: () => api.get("/api/logs/me"),
+  getByModule: (moduleId) => api.get(`/api/logs/module/${moduleId}`),
   create: (moduleId) => api.post("/api/logs", { module_id: moduleId }),
-  complete: (id) => api.put(`/api/logs/${id}`, { status: "Selesai" }),
+  submitTask: (id, payload) => api.put(`/api/logs/${id}/submission`, payload),
+  validate: (id, payload) => api.put(`/api/logs/${id}/validation`, payload),
 };
 
 export default api;

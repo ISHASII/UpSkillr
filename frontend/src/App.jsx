@@ -14,6 +14,7 @@ import HRDashboard from "./pages/hr/HRDashboard";
 import HRModulIndex from "./pages/hr/modul/Index";
 import HRModulCreate from "./pages/hr/modul/Create";
 import HRModulEdit from "./pages/hr/modul/Edit";
+import HRModulParticipants from "./pages/hr/modul/Participants";
 import HRKaryawanIndex from "./pages/hr/karyawan/Index";
 import HRKaryawanCreate from "./pages/hr/karyawan/Create";
 import HRKaryawanEdit from "./pages/hr/karyawan/Edit";
@@ -49,10 +50,22 @@ const emptyLogin = {
   password: "",
 };
 
+const emptyForgotPassword = {
+  email: "",
+  otp: "",
+  newPassword: "",
+  confirmNewPassword: "",
+};
+
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
 const emptyModule = {
   judul: "",
   deskripsi: "",
+  goalsModule: "",
   linkMateri: "",
+  materiFiles: [],
+  existingMateriFiles: [],
   targetSkills: [],
 };
 
@@ -112,6 +125,9 @@ function App() {
   const [activeAuthTab, setActiveAuthTab] = useState("login");
   const [registerForm, setRegisterForm] = useState(emptyRegister);
   const [loginForm, setLoginForm] = useState(emptyLogin);
+  const [forgotPasswordForm, setForgotPasswordForm] =
+    useState(emptyForgotPassword);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState("email");
 
   const [modules, setModules] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -150,9 +166,9 @@ function App() {
     deskripsi: "",
   });
 
-  const [skillsInput, setSkillsInput] = useState("");
-  const [createLogModuleId, setCreateLogModuleId] = useState("");
-  const [completeLogId, setCompleteLogId] = useState("");
+  const [selectedModuleForValidation, setSelectedModuleForValidation] =
+    useState(null);
+  const [moduleParticipants, setModuleParticipants] = useState([]);
 
   const [loading, setLoading] = useState(false);
 
@@ -258,6 +274,13 @@ function App() {
     }
   }, [isAuthenticated, location.pathname, navigate]);
 
+  useEffect(() => {
+    if (activeAuthTab !== "forgot-password") {
+      setForgotPasswordStep("email");
+      setForgotPasswordForm(emptyForgotPassword);
+    }
+  }, [activeAuthTab]);
+
   const fetchModules = async () => {
     if (!isAuthenticated || !canAccessModules) return;
 
@@ -270,11 +293,22 @@ function App() {
   };
 
   const fetchLogs = async () => {
-    if (!isAuthenticated || !canManageLogsHR) return;
+    if (!isAuthenticated) return;
 
     try {
-      const response = await logApi.getAll();
+      const response = canManageLogsHR
+        ? await logApi.getAll()
+        : await logApi.getMine();
       setLogs(response.data.data || []);
+
+      if (!canManageLogsHR && user?._id) {
+        const meResponse = await userApi.getById(user._id);
+        const latestUser = meResponse.data.data;
+        if (latestUser) {
+          setUser(latestUser);
+          localStorage.setItem("user", JSON.stringify(latestUser));
+        }
+      }
     } catch (error) {
       showError(error, "Gagal mengambil data progress log");
     }
@@ -366,19 +400,221 @@ function App() {
     }
   };
 
-  const handleCreateModule = async (event) => {
-    event.preventDefault();
+  const handleRequestForgotPasswordOtp = async (event) => {
+    if (event?.preventDefault) event.preventDefault();
+
+    const email = (forgotPasswordForm.email || "").trim();
+    if (!email) {
+      showError(null, "Email wajib diisi untuk kirim OTP");
+      return;
+    }
+
+    const requestOtpForEmail = async (targetEmail) => {
+      const response = await authApi.requestForgotPasswordOtp({
+        email: targetEmail,
+      });
+      const emailExists = response?.data?.data?.emailExists;
+      return { emailExists };
+    };
+
+    const openOtpVerificationModal = async (targetEmail) => {
+      while (true) {
+        let countdown = OTP_RESEND_COOLDOWN_SECONDS;
+        let countdownInterval = null;
+
+        const otpPrompt = await Swal.fire({
+          title: "Masukkan OTP",
+          text: "OTP sudah dikirim ke email kamu",
+          input: "text",
+          inputLabel: "Kode OTP",
+          inputPlaceholder: "Masukkan 6 digit OTP",
+          inputAttributes: {
+            inputmode: "numeric",
+            maxlength: 6,
+            autocapitalize: "off",
+            autocomplete: "one-time-code",
+          },
+          showCancelButton: true,
+          showDenyButton: true,
+          confirmButtonText: "Verifikasi OTP",
+          cancelButtonText: "Batal",
+          denyButtonText: `Kirim Ulang (${countdown}s)`,
+          width: 420,
+          didOpen: () => {
+            const otpInput = Swal.getInput();
+            if (otpInput) {
+              otpInput.focus();
+              otpInput.addEventListener("input", () => {
+                otpInput.value = otpInput.value.replace(/\D/g, "").slice(0, 6);
+              });
+            }
+
+            const denyButton = Swal.getDenyButton();
+            if (denyButton) {
+              denyButton.disabled = true;
+              countdownInterval = setInterval(() => {
+                countdown -= 1;
+                if (countdown <= 0) {
+                  clearInterval(countdownInterval);
+                  denyButton.disabled = false;
+                  denyButton.textContent = "Kirim Ulang OTP";
+                } else {
+                  denyButton.textContent = `Kirim Ulang (${countdown}s)`;
+                }
+              }, 1000);
+            }
+          },
+          willClose: () => {
+            if (countdownInterval) clearInterval(countdownInterval);
+          },
+          preConfirm: async (otpInput) => {
+            const otp = (otpInput || "").trim();
+            if (!/^\d{6}$/.test(otp)) {
+              Swal.showValidationMessage("OTP harus 6 digit angka");
+              return null;
+            }
+
+            try {
+              await authApi.verifyForgotPasswordOtp({
+                email: targetEmail,
+                otp,
+              });
+              return otp;
+            } catch (error) {
+              const message =
+                error?.response?.data?.message || "OTP tidak valid";
+              Swal.showValidationMessage(message);
+              return null;
+            }
+          },
+        });
+
+        if (otpPrompt.isConfirmed) {
+          setForgotPasswordForm((prev) => ({
+            ...prev,
+            email: targetEmail,
+            otp: otpPrompt.value,
+          }));
+          setForgotPasswordStep("reset");
+          showSuccess("OTP valid, sekarang isi password baru");
+          return;
+        }
+
+        if (otpPrompt.isDenied) {
+          try {
+            const resendResponse = await requestOtpForEmail(targetEmail);
+            if (!resendResponse.emailExists) {
+              showError(null, "Email tidak terdaftar di sistem");
+              return;
+            }
+            continue;
+          } catch (error) {
+            showError(error, "Gagal mengirim ulang OTP");
+            return;
+          }
+        }
+
+        return;
+      }
+    };
+
     setLoading(true);
     try {
-      const payload = {
-        ...newModuleForm,
-        // targetSkills should be array of skill IDs
-        targetSkills: Array.isArray(newModuleForm.targetSkills)
-          ? newModuleForm.targetSkills
-          : [],
-      };
+      const response = await requestOtpForEmail(email);
+      if (!response.emailExists) {
+        showError(null, "Email tidak terdaftar di sistem");
+        return;
+      }
+    } catch (error) {
+      showError(error, "Gagal mengirim OTP reset password");
+      return;
+    } finally {
+      setLoading(false);
+    }
 
-      await moduleApi.create(payload);
+    await openOtpVerificationModal(email);
+  };
+
+  const handleResetPasswordWithOtp = async (event) => {
+    event.preventDefault();
+
+    const email = (forgotPasswordForm.email || "").trim();
+    const otp = (forgotPasswordForm.otp || "").trim();
+    const newPassword = forgotPasswordForm.newPassword || "";
+    const confirmNewPassword = forgotPasswordForm.confirmNewPassword || "";
+
+    if (!email || !otp || !newPassword || !confirmNewPassword) {
+      showError(null, "Lengkapi email, OTP, dan password baru");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      showError(null, "Password baru dan konfirmasi password tidak cocok");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await authApi.resetPasswordWithOtp({
+        email,
+        otp,
+        newPassword,
+      });
+
+      showSuccess(
+        response?.data?.message ||
+          "Password berhasil direset, silakan login kembali",
+      );
+
+      setForgotPasswordForm(emptyForgotPassword);
+      setForgotPasswordStep("email");
+      setActiveAuthTab("login");
+      setLoginForm((prev) => ({ ...prev, email, password: "" }));
+    } catch (error) {
+      showError(error, "Gagal reset password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToForgotEmailStep = () => {
+    setForgotPasswordForm((prev) => ({
+      ...prev,
+      otp: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    }));
+    setForgotPasswordStep("email");
+  };
+
+  const handleCreateModule = async (event) => {
+    event.preventDefault();
+
+    if (
+      !(newModuleForm.linkMateri || "").trim() &&
+      !(newModuleForm.materiFiles || []).length
+    ) {
+      showError(null, "Isi Link Materi atau upload minimal 1 file materi");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("judul", newModuleForm.judul || "");
+      formData.append("deskripsi", newModuleForm.deskripsi || "");
+      formData.append("goalsModule", newModuleForm.goalsModule || "");
+      formData.append("linkMateri", newModuleForm.linkMateri || "");
+      formData.append(
+        "targetSkills",
+        JSON.stringify(newModuleForm.targetSkills || []),
+      );
+
+      (newModuleForm.materiFiles || []).forEach((file) => {
+        formData.append("materiFiles", file);
+      });
+
+      await moduleApi.create(formData);
       showSuccess("Modul berhasil dibuat");
       setNewModuleForm(emptyModule);
       await fetchModules();
@@ -403,27 +639,33 @@ function App() {
       return;
     }
 
+    if (
+      !(editModuleForm.linkMateri || "").trim() &&
+      !(editModuleForm.materiFiles || []).length &&
+      !(editModuleForm.existingMateriFiles || []).length
+    ) {
+      showError(null, "Isi Link Materi atau upload minimal 1 file materi");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const payload = {
-        judul: editModuleForm.judul,
-        deskripsi: editModuleForm.deskripsi,
-        linkMateri: editModuleForm.linkMateri,
-        targetSkills: Array.isArray(editModuleForm.targetSkills)
-          ? editModuleForm.targetSkills
-          : [],
-      };
+      const formData = new FormData();
+      formData.append("judul", editModuleForm.judul || "");
+      formData.append("deskripsi", editModuleForm.deskripsi || "");
+      formData.append("goalsModule", editModuleForm.goalsModule || "");
+      formData.append("linkMateri", editModuleForm.linkMateri || "");
+      formData.append(
+        "targetSkills",
+        JSON.stringify(editModuleForm.targetSkills || []),
+      );
 
-      Object.keys(payload).forEach((key) => {
-        if (Array.isArray(payload[key])) {
-          if (payload[key].length === 0) delete payload[key];
-        } else if (!payload[key]) {
-          delete payload[key];
-        }
+      (editModuleForm.materiFiles || []).forEach((file) => {
+        formData.append("materiFiles", file);
       });
 
-      await moduleApi.update(editModuleId, payload);
+      await moduleApi.update(editModuleId, formData);
       showSuccess("Modul berhasil diperbarui");
       await fetchModules();
       navigate("/dashboard/hr/modul");
@@ -457,86 +699,77 @@ function App() {
     }
   };
 
-  const handleUpdateSkills = async (event) => {
-    if (event?.preventDefault) event.preventDefault();
+  const handleEnrollModule = async (moduleId) => {
     setLoading(true);
-
     try {
-      const skills = skillsInput
-        .split(",")
-        .map((skill) => skill.trim())
-        .filter(Boolean);
-
-      const response = await userApi.updateProfileSkills(skills);
-      const nextUser = { ...user, ...response.data.data };
-      setUser(nextUser);
-      localStorage.setItem("user", JSON.stringify(nextUser));
-      showSuccess("Skills profile berhasil diperbarui");
+      await logApi.create(moduleId);
+      showSuccess("Berhasil daftar modul");
+      await fetchLogs();
     } catch (error) {
-      showError(error, "Gagal memperbarui skills");
+      showError(error, "Gagal mendaftar modul");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateLog = async (event) => {
-    if (event?.preventDefault) event.preventDefault();
-    if (!createLogModuleId.trim()) {
-      await Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Isi Module ID terlebih dahulu",
-        confirmButtonText: "OK",
-        width: 420,
-      });
+  const handleSubmitTask = async (logId, submissionData) => {
+    const link = (submissionData?.submissionLink || "").trim();
+    const files = submissionData?.files || [];
+
+    if (!link && !files.length) {
+      showError(null, "Isi link tugas atau upload minimal 1 file tugas");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await logApi.create(createLogModuleId);
-      const createdLog = response.data.data;
-      setLogs((prev) => [createdLog, ...prev]);
-      showSuccess("Progress log berhasil dibuat");
-      setCreateLogModuleId("");
-      await fetchModules();
+      const formData = new FormData();
+      formData.append("submissionLink", link);
+      files.forEach((file) => formData.append("submissionFiles", file));
+
+      await logApi.submitTask(logId, formData);
+      showSuccess("Tugas berhasil disubmit, menunggu validasi HR");
+      await fetchLogs();
     } catch (error) {
-      showError(error, "Gagal membuat progress log");
+      showError(error, "Gagal submit tugas");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCompleteLog = async (event) => {
-    if (event?.preventDefault) event.preventDefault();
-    if (!completeLogId.trim()) {
-      await Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Isi Log ID terlebih dahulu",
-        confirmButtonText: "OK",
-        width: 420,
-      });
-      return;
-    }
-
+  const fetchModuleParticipants = async (moduleId) => {
     setLoading(true);
     try {
-      const response = await logApi.complete(completeLogId);
-      const updatedLog = response.data.data;
-      setLogs((prev) => {
-        const exists = prev.some((item) => item._id === updatedLog._id);
-        if (exists) {
-          return prev.map((item) =>
-            item._id === updatedLog._id ? updatedLog : item,
-          );
-        }
-        return [updatedLog, ...prev];
-      });
-      showSuccess("Status log berhasil diubah ke Selesai");
-      await fetchModules();
+      const response = await logApi.getByModule(moduleId);
+      setModuleParticipants(response.data.data || []);
     } catch (error) {
-      showError(error, "Gagal mengubah status log");
+      showError(error, "Gagal mengambil peserta modul");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenModuleParticipants = async (moduleItem) => {
+    setSelectedModuleForValidation(moduleItem);
+    await fetchModuleParticipants(moduleItem._id);
+    navigate("/dashboard/hr/modul/participants");
+  };
+
+  const handleValidateSubmission = async (logId, action, feedback) => {
+    setLoading(true);
+    try {
+      await logApi.validate(logId, { action, feedback });
+      showSuccess(
+        action === "approve"
+          ? "Karyawan dinyatakan lulus"
+          : "Submission dikembalikan ke karyawan",
+      );
+      if (selectedModuleForValidation?._id) {
+        await fetchModuleParticipants(selectedModuleForValidation._id);
+      }
+      await fetchLogs();
+    } catch (error) {
+      showError(error, "Gagal memvalidasi submission");
     } finally {
       setLoading(false);
     }
@@ -767,19 +1000,7 @@ function App() {
     }
   };
 
-  const renderKaryawanDashboard = () => (
-    <KaryawanDashboardPage
-      loading={loading}
-      modules={modules}
-      logs={logs}
-      createLogModuleId={createLogModuleId}
-      setCreateLogModuleId={setCreateLogModuleId}
-      completeLogId={completeLogId}
-      setCompleteLogId={setCompleteLogId}
-      onCreateLog={handleCreateLog}
-      onCompleteLog={handleCompleteLog}
-    />
-  );
+  const renderKaryawanDashboard = () => <KaryawanDashboardPage logs={logs} />;
 
   return (
     <main
@@ -827,8 +1048,14 @@ function App() {
                   setRegisterForm={setRegisterForm}
                   loginForm={loginForm}
                   setLoginForm={setLoginForm}
+                  forgotPasswordForm={forgotPasswordForm}
+                  setForgotPasswordForm={setForgotPasswordForm}
+                  forgotPasswordStep={forgotPasswordStep}
+                  onBackToEmailStep={handleBackToForgotEmailStep}
                   onRegister={handleRegister}
                   onLogin={handleLogin}
+                  onRequestOtp={handleRequestForgotPasswordOtp}
+                  onResetPassword={handleResetPasswordWithOtp}
                 />
               )
             }
@@ -872,6 +1099,26 @@ function App() {
                     onDeleteModule={handleDeleteModule}
                     setEditModuleId={setEditModuleId}
                     setEditModuleForm={setEditModuleForm}
+                    onOpenParticipants={handleOpenModuleParticipants}
+                  />
+                </HRLayout>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/dashboard/hr/modul/participants"
+            element={
+              <RequireRole
+                isAuthenticated={isAuthenticated}
+                userRole={role}
+                allowedRoles={["HR"]}
+              >
+                <HRLayout user={user} onLogout={clearAuthData}>
+                  <HRModulParticipants
+                    selectedModule={selectedModuleForValidation}
+                    participants={moduleParticipants}
+                    onValidateSubmission={handleValidateSubmission}
+                    loading={loading}
                   />
                 </HRLayout>
               </RequireRole>
@@ -1076,7 +1323,13 @@ function App() {
                 allowedRoles={["Karyawan"]}
               >
                 <KaryawanLayout user={user} onLogout={clearAuthData}>
-                  <KaryawanModulPage modules={modules} />
+                  <KaryawanModulPage
+                    modules={modules}
+                    logs={logs}
+                    loading={loading}
+                    onEnrollModule={handleEnrollModule}
+                    onSubmitTask={handleSubmitTask}
+                  />
                 </KaryawanLayout>
               </RequireRole>
             }

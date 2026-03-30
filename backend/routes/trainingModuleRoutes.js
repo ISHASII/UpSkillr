@@ -3,6 +3,7 @@ const trainingModuleController = require("../controllers/trainingModuleControlle
 const authMiddleware = require("../middlewares/authMiddleware");
 const roleMiddleware = require("../middlewares/roleMiddleware");
 const asyncHandler = require("../middlewares/asyncHandler");
+const { uploadModuleMaterials } = require("../middlewares/uploadMiddleware");
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.post(
   "/",
   authMiddleware,
   roleMiddleware("HR"),
+  uploadModuleMaterials,
   asyncHandler(trainingModuleController.createTrainingModule),
 );
 
@@ -24,6 +26,7 @@ router.put(
   "/:id",
   authMiddleware,
   roleMiddleware("HR"),
+  uploadModuleMaterials,
   asyncHandler(trainingModuleController.updateTrainingModule),
 );
 

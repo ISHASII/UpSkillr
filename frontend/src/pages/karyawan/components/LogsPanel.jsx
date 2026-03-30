@@ -1,6 +1,8 @@
 const statusClass = {
-  "Belum Selesai": "bg-amber-100 text-amber-800",
-  Selesai: "bg-emerald-100 text-emerald-800",
+  "Sedang Berjalan": "bg-sky-100 text-sky-800",
+  "Menunggu Validasi HR": "bg-amber-100 text-amber-800",
+  "Perlu Revisi": "bg-rose-100 text-rose-800",
+  Lulus: "bg-emerald-100 text-emerald-800",
 };
 
 function LogsPanel({ logs }) {

@@ -5,6 +5,7 @@ const createTrainingModule = async (req, res, next) => {
   try {
     const moduleData = await trainingModuleService.createTrainingModule(
       req.body,
+      req.files,
     );
 
     res.status(201).json({
@@ -73,6 +74,7 @@ const updateTrainingModule = async (req, res, next) => {
     const moduleData = await trainingModuleService.updateTrainingModule(
       id,
       req.body,
+      req.files,
     );
 
     if (!moduleData) {

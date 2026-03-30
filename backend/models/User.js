@@ -37,6 +37,23 @@ const userSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    forgotPasswordOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    forgotPasswordOtpExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    forgotPasswordOtpRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    forgotPasswordOtpAttempts: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true },
 );

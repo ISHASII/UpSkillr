@@ -70,9 +70,20 @@ function HRModulEdit({
             }))
           }
         />
+        <textarea
+          className="glass-input min-h-20 w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-slate-300"
+          placeholder="Goals Module"
+          value={editModuleForm.goalsModule || ""}
+          onChange={(event) =>
+            setEditModuleForm((prev) => ({
+              ...prev,
+              goalsModule: event.target.value,
+            }))
+          }
+        />
         <input
           className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-slate-300"
-          placeholder="Link Materi"
+          placeholder="Link Materi (opsional jika upload file)"
           value={editModuleForm.linkMateri}
           onChange={(event) =>
             setEditModuleForm((prev) => ({
@@ -81,6 +92,30 @@ function HRModulEdit({
             }))
           }
         />
+        <input
+          className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none file:mr-3 file:rounded-md file:border-0 file:bg-indigo-500 file:px-3 file:py-1 file:text-white"
+          type="file"
+          multiple
+          onChange={(event) =>
+            setEditModuleForm((prev) => ({
+              ...prev,
+              materiFiles: Array.from(event.target.files || []),
+            }))
+          }
+        />
+        {(editModuleForm.existingMateriFiles || []).length ? (
+          <div className="text-xs text-slate-700">
+            <div className="mb-1 font-medium">File materi saat ini:</div>
+            <ul className="list-disc space-y-1 pl-4">
+              {editModuleForm.existingMateriFiles.map((filePath) => (
+                <li key={filePath}>{filePath}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <p className="text-xs text-slate-600">
+          Wajib isi minimal salah satu: Link Materi atau File Materi.
+        </p>
 
         <div ref={ref} className="relative">
           <div className="mb-2 text-sm font-medium text-slate-800">

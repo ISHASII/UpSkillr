@@ -3,6 +3,7 @@ const progressLogController = require("../controllers/progressLogController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const roleMiddleware = require("../middlewares/roleMiddleware");
 const asyncHandler = require("../middlewares/asyncHandler");
+const { uploadSubmissionFiles } = require("../middlewares/uploadMiddleware");
 
 const router = express.Router();
 
@@ -13,6 +14,20 @@ router.get(
   asyncHandler(progressLogController.getProgressLogsForHR),
 );
 
+router.get(
+  "/me",
+  authMiddleware,
+  roleMiddleware("Karyawan"),
+  asyncHandler(progressLogController.getProgressLogsForKaryawan),
+);
+
+router.get(
+  "/module/:moduleId",
+  authMiddleware,
+  roleMiddleware("HR"),
+  asyncHandler(progressLogController.getProgressLogsByModuleForHR),
+);
+
 router.post(
   "/",
   authMiddleware,
@@ -21,10 +36,18 @@ router.post(
 );
 
 router.put(
-  "/:id",
+  "/:id/submission",
   authMiddleware,
   roleMiddleware("Karyawan"),
-  asyncHandler(progressLogController.updateProgressLogStatusAsKaryawan),
+  uploadSubmissionFiles,
+  asyncHandler(progressLogController.submitProgressLogAsKaryawan),
+);
+
+router.put(
+  "/:id/validation",
+  authMiddleware,
+  roleMiddleware("HR"),
+  asyncHandler(progressLogController.validateProgressLogByHR),
 );
 
 module.exports = router;
