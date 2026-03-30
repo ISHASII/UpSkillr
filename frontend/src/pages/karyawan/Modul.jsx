@@ -2,6 +2,7 @@ import ModuleCards from "./components/ModuleCards";
 
 function KaryawanModulPage({
   modules,
+  recommendedModules,
   logs,
   loading,
   onEnrollModule,
@@ -10,6 +11,7 @@ function KaryawanModulPage({
   return (
     <ModuleCards
       modules={modules}
+      recommendedModules={recommendedModules}
       logs={logs}
       loading={loading}
       onEnrollModule={onEnrollModule}

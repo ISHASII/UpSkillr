@@ -13,10 +13,49 @@ router.put(
   asyncHandler(userController.updateProfileSkills),
 );
 
-router.post("/", asyncHandler(userController.createUser));
-router.get("/", asyncHandler(userController.getUsers));
-router.get("/:id", asyncHandler(userController.getUserById));
-router.put("/:id", asyncHandler(userController.updateUser));
-router.delete("/:id", asyncHandler(userController.deleteUser));
+router.get(
+  "/registrations/pending",
+  authMiddleware,
+  roleMiddleware("HR"),
+  asyncHandler(userController.getPendingRegistrations),
+);
+
+router.put(
+  "/registrations/:id/decision",
+  authMiddleware,
+  roleMiddleware("HR"),
+  asyncHandler(userController.decideRegistration),
+);
+
+router.post(
+  "/",
+  authMiddleware,
+  roleMiddleware("HR"),
+  asyncHandler(userController.createUser),
+);
+router.get(
+  "/",
+  authMiddleware,
+  roleMiddleware("HR"),
+  asyncHandler(userController.getUsers),
+);
+router.get(
+  "/:id",
+  authMiddleware,
+  roleMiddleware("HR", "Karyawan"),
+  asyncHandler(userController.getUserById),
+);
+router.put(
+  "/:id",
+  authMiddleware,
+  roleMiddleware("HR", "Karyawan"),
+  asyncHandler(userController.updateUser),
+);
+router.delete(
+  "/:id",
+  authMiddleware,
+  roleMiddleware("HR"),
+  asyncHandler(userController.deleteUser),
+);
 
 module.exports = router;

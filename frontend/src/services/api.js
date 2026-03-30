@@ -44,6 +44,7 @@ api.interceptors.response.use(
 export const authApi = {
   register: (payload) => api.post("/api/auth/register", payload),
   login: (payload) => api.post("/api/auth/login", payload),
+  loginWithGoogle: (payload) => api.post("/api/auth/google", payload),
   requestForgotPasswordOtp: (payload) =>
     api.post("/api/auth/forgot-password/request-otp", payload),
   verifyForgotPasswordOtp: (payload) =>
@@ -54,6 +55,7 @@ export const authApi = {
 
 export const moduleApi = {
   getAll: () => api.get("/api/modules"),
+  getRecommendedForMe: () => api.get("/api/modules/recommendations/me"),
   create: (payload) => api.post("/api/modules", payload),
   update: (id, payload) => api.put(`/api/modules/${id}`, payload),
   remove: (id) => api.delete(`/api/modules/${id}`),
@@ -61,6 +63,9 @@ export const moduleApi = {
 
 export const userApi = {
   getAll: () => api.get("/api/users"),
+  getPendingRegistrations: () => api.get("/api/users/registrations/pending"),
+  decideRegistration: (id, payload) =>
+    api.put(`/api/users/registrations/${id}/decision`, payload),
   create: (payload) => api.post("/api/users", payload),
   getById: (id) => api.get(`/api/users/${id}`),
   update: (id, payload) => api.put(`/api/users/${id}`, payload),

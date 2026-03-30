@@ -6,7 +6,9 @@ const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Registrasi berhasil",
+      message: authResult.requiresApproval
+        ? "Registrasi berhasil. Menunggu persetujuan HRD"
+        : "Registrasi berhasil",
       data: authResult,
     });
   } catch (error) {
@@ -30,6 +32,25 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error("[AUTH CONTROLLER] login error", error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Terjadi kesalahan pada server",
+      ...(process.env.NODE_ENV !== "production" ? { stack: error.stack } : {}),
+    });
+  }
+};
+
+const loginWithGoogle = async (req, res) => {
+  try {
+    const authResult = await authService.loginWithGoogle(req.body);
+
+    res.status(200).json({
+      success: true,
+      message: "Login Google berhasil",
+      data: authResult,
+    });
+  } catch (error) {
+    console.error("[AUTH CONTROLLER] loginWithGoogle error", error);
     res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Terjadi kesalahan pada server",
@@ -98,6 +119,7 @@ const resetPasswordWithOtp = async (req, res) => {
 module.exports = {
   register,
   login,
+  loginWithGoogle,
   requestForgotPasswordOtp,
   verifyForgotPasswordOtp,
   resetPasswordWithOtp,

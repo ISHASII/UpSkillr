@@ -13,8 +13,23 @@ const statusClass = {
   Lulus: "bg-emerald-100 text-emerald-800",
 };
 
-function ModuleCards({ modules, logs, loading, onEnrollModule, onSubmitTask }) {
+function ModuleCards({
+  modules,
+  recommendedModules,
+  logs,
+  loading,
+  onEnrollModule,
+  onSubmitTask,
+}) {
   const [submission, setSubmission] = useState({});
+
+  const recommendedById = useMemo(() => {
+    const map = {};
+    (recommendedModules || []).forEach((moduleItem) => {
+      if (moduleItem?._id) map[moduleItem._id] = moduleItem.recommendation;
+    });
+    return map;
+  }, [recommendedModules]);
 
   const logByModule = useMemo(() => {
     const map = {};
@@ -45,12 +60,18 @@ function ModuleCards({ modules, logs, loading, onEnrollModule, onSubmitTask }) {
               progress &&
               (progress.status === "Sedang Berjalan" ||
                 progress.status === "Perlu Revisi");
+            const recommendation = recommendedById[moduleItem._id];
 
             return (
               <article
                 key={moduleItem._id}
                 className="rounded-xl border border-slate-300/40 bg-white/45 p-4"
               >
+                {recommendation ? (
+                  <div className="mb-2 inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
+                    Direkomendasikan untuk kamu (Skor {recommendation.score})
+                  </div>
+                ) : null}
                 <h3 className="text-base font-semibold text-slate-900">
                   {moduleItem.judul}
                 </h3>
@@ -66,6 +87,10 @@ function ModuleCards({ modules, logs, loading, onEnrollModule, onSubmitTask }) {
                     .map(resolveSkillName)
                     .filter(Boolean)
                     .join(", ") || "-"}
+                </p>
+                <p className="mt-1 text-xs text-slate-700">
+                  Target Divisi:{" "}
+                  {(moduleItem.targetDivisions || []).join(", ") || "-"}
                 </p>
 
                 <div className="mt-3 space-y-1 text-xs">

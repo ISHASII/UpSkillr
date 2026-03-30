@@ -26,9 +26,30 @@ const userSchema = new mongoose.Schema(
       enum: ["HR", "Karyawan"],
       required: true,
     },
+    registrationStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: function () {
+        return this.role === "Karyawan" ? "pending" : "approved";
+      },
+    },
+    registrationReviewedAt: {
+      type: Date,
+      default: null,
+    },
+    registrationReviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    registrationRejectionReason: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     divisi: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
     },
     skills: [

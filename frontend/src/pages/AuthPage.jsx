@@ -1,3 +1,5 @@
+import { GoogleLogin } from "@react-oauth/google";
+
 function AuthPage({
   activeAuthTab,
   setActiveAuthTab,
@@ -12,6 +14,9 @@ function AuthPage({
   onBackToEmailStep,
   onRegister,
   onLogin,
+  onGoogleLoginSuccess,
+  onGoogleLoginError,
+  googleLoginEnabled,
   onRequestOtp,
   onResetPassword,
 }) {
@@ -110,6 +115,30 @@ function AuthPage({
             >
               Lupa Password?
             </button>
+
+            {googleLoginEnabled ? (
+              <>
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-400/40" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-white/50 px-3 text-xs text-slate-700">
+                      atau
+                    </span>
+                  </div>
+                </div>
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={onGoogleLoginSuccess}
+                    onError={onGoogleLoginError}
+                    width="320"
+                    text="signin_with"
+                    shape="pill"
+                  />
+                </div>
+              </>
+            ) : null}
           </form>
         ) : activeAuthTab === "register" ? (
           <form className="space-y-3.5" onSubmit={onRegister}>
@@ -188,6 +217,11 @@ function AuthPage({
             >
               {loading ? "Memproses..." : "Register"}
             </button>
+
+            <p className="text-xs text-slate-700">
+              Registrasi karyawan akan menunggu persetujuan HRD. Status
+              persetujuan dikirim via email.
+            </p>
           </form>
         ) : forgotPasswordStep === "email" ? (
           <form className="space-y-3.5" onSubmit={onRequestOtp}>

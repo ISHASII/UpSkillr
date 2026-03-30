@@ -40,9 +40,6 @@ const emptyRegister = {
   email: "",
   password: "",
   confirmPassword: "",
-  role: "Karyawan",
-  divisi: "General",
-  skills: "",
 };
 
 const emptyLogin = {
@@ -67,6 +64,7 @@ const emptyModule = {
   materiFiles: [],
   existingMateriFiles: [],
   targetSkills: [],
+  targetDivisions: [],
 };
 
 const parseStoredUser = () => {
@@ -130,6 +128,7 @@ function App() {
   const [forgotPasswordStep, setForgotPasswordStep] = useState("email");
 
   const [modules, setModules] = useState([]);
+  const [recommendedModules, setRecommendedModules] = useState([]);
   const [logs, setLogs] = useState([]);
   const [users, setUsers] = useState([]);
 
@@ -178,6 +177,7 @@ function App() {
 
   const isAuthenticated = Boolean(token && user);
   const role = user?.role || null;
+  const googleLoginEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   const canAccessModules = useMemo(
     () => role === "HR" || role === "Karyawan",
@@ -224,6 +224,19 @@ function App() {
 
   const showError = (error, fallbackMessage) => {
     const message = error?.response?.data?.message || fallbackMessage;
+
+    // If account is pending HR approval, show a non-error 'waiting' info alert
+    if (/menunggu persetujuan/i.test(String(message || ""))) {
+      Swal.fire({
+        icon: "info",
+        title: "Menunggu Persetujuan",
+        text: String(message || "").replace(/\s+/g, " "),
+        confirmButtonText: "OK",
+        width: 420,
+      });
+      return;
+    }
+
     Swal.fire({
       icon: "error",
       title: "Error",
@@ -292,6 +305,20 @@ function App() {
     }
   };
 
+  const fetchRecommendedModules = async () => {
+    if (!isAuthenticated || role !== "Karyawan") {
+      setRecommendedModules([]);
+      return;
+    }
+
+    try {
+      const response = await moduleApi.getRecommendedForMe();
+      setRecommendedModules(response.data.data || []);
+    } catch (error) {
+      showError(error, "Gagal mengambil rekomendasi modul");
+    }
+  };
+
   const fetchLogs = async () => {
     if (!isAuthenticated) return;
 
@@ -337,6 +364,7 @@ function App() {
   };
   useEffect(() => {
     fetchModules();
+    fetchRecommendedModules();
     fetchLogs();
     fetchUsers();
     fetchSkills();
@@ -369,14 +397,16 @@ function App() {
         email: registerForm.email,
         password: registerForm.password,
         role: "Karyawan",
-        divisi: "General",
         skills: [],
       };
 
-      const response = await authApi.register(payload);
-      setAuthData(response.data.data);
-      showSuccess("Registrasi berhasil dan kamu langsung login");
+      await authApi.register(payload);
+      showSuccess(
+        "Registrasi berhasil. Menunggu persetujuan HRD, notifikasi akan dikirim ke email.",
+      );
       setRegisterForm(emptyRegister);
+      setActiveAuthTab("login");
+      setLoginForm((prev) => ({ ...prev, email: payload.email }));
     } catch (error) {
       showError(error, "Registrasi gagal");
     } finally {
@@ -398,6 +428,30 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleLogin = async (googleCredentialResponse) => {
+    const credential = googleCredentialResponse?.credential;
+    if (!credential) {
+      showError(null, "Credential Google tidak ditemukan");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await authApi.loginWithGoogle({ credential });
+      setAuthData(response.data.data);
+      showSuccess("Login Google berhasil");
+      setLoginForm(emptyLogin);
+    } catch (error) {
+      showError(error, "Login Google gagal");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    showError(null, "Autentikasi Google gagal. Coba lagi.");
   };
 
   const handleRequestForgotPasswordOtp = async (event) => {
@@ -609,6 +663,10 @@ function App() {
         "targetSkills",
         JSON.stringify(newModuleForm.targetSkills || []),
       );
+      formData.append(
+        "targetDivisions",
+        JSON.stringify(newModuleForm.targetDivisions || []),
+      );
 
       (newModuleForm.materiFiles || []).forEach((file) => {
         formData.append("materiFiles", file);
@@ -659,6 +717,10 @@ function App() {
       formData.append(
         "targetSkills",
         JSON.stringify(editModuleForm.targetSkills || []),
+      );
+      formData.append(
+        "targetDivisions",
+        JSON.stringify(editModuleForm.targetDivisions || []),
       );
 
       (editModuleForm.materiFiles || []).forEach((file) => {
@@ -937,6 +999,72 @@ function App() {
     }
   };
 
+  const handleApproveRegistration = async (userItem) => {
+    const decision = await Swal.fire({
+      title: `Approve registrasi ${userItem?.nama || "karyawan"}?`,
+      input: "text",
+      inputLabel: "Divisi Karyawan",
+      inputPlaceholder: "Contoh: Engineering",
+      showCancelButton: true,
+      confirmButtonText: "Approve",
+      cancelButtonText: "Batal",
+      width: 420,
+      inputValidator: (value) => {
+        if (!String(value || "").trim()) {
+          return "Divisi wajib diisi saat approve";
+        }
+        return null;
+      },
+    });
+
+    if (!decision.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await userApi.decideRegistration(userItem._id, {
+        status: "approved",
+        divisi: String(decision.value || "").trim(),
+      });
+      showSuccess(
+        "Registrasi berhasil disetujui dan notifikasi email terkirim",
+      );
+      await fetchUsers();
+    } catch (error) {
+      showError(error, "Gagal approve registrasi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectRegistration = async (userItem) => {
+    const decision = await Swal.fire({
+      title: `Tolak registrasi ${userItem?.nama || "karyawan"}?`,
+      input: "textarea",
+      inputLabel: "Alasan (opsional)",
+      inputPlaceholder: "Tulis alasan penolakan",
+      showCancelButton: true,
+      confirmButtonText: "Tolak",
+      cancelButtonText: "Batal",
+      width: 420,
+    });
+
+    if (!decision.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await userApi.decideRegistration(userItem._id, {
+        status: "rejected",
+        reason: String(decision.value || "").trim(),
+      });
+      showSuccess("Registrasi ditolak dan notifikasi email terkirim");
+      await fetchUsers();
+    } catch (error) {
+      showError(error, "Gagal menolak registrasi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateProfile = async (event) => {
     event.preventDefault();
     if (!user?._id) {
@@ -970,6 +1098,7 @@ function App() {
         role: normalized.role || "Karyawan",
       });
       showSuccess("Profil berhasil diperbarui");
+      await fetchRecommendedModules();
     } catch (error) {
       showError(error, "Gagal memperbarui profil");
     } finally {
@@ -1054,6 +1183,9 @@ function App() {
                   onBackToEmailStep={handleBackToForgotEmailStep}
                   onRegister={handleRegister}
                   onLogin={handleLogin}
+                  onGoogleLoginSuccess={handleGoogleLogin}
+                  onGoogleLoginError={handleGoogleLoginError}
+                  googleLoginEnabled={googleLoginEnabled}
                   onRequestOtp={handleRequestForgotPasswordOtp}
                   onResetPassword={handleResetPasswordWithOtp}
                 />
@@ -1177,6 +1309,8 @@ function App() {
                   <HRKaryawanIndex
                     users={users}
                     onDeleteUser={handleDeleteUser}
+                    onApproveRegistration={handleApproveRegistration}
+                    onRejectRegistration={handleRejectRegistration}
                     setEditUserId={setEditUserId}
                     setEditUserForm={setEditUserForm}
                   />
@@ -1325,6 +1459,7 @@ function App() {
                 <KaryawanLayout user={user} onLogout={clearAuthData}>
                   <KaryawanModulPage
                     modules={modules}
+                    recommendedModules={recommendedModules}
                     logs={logs}
                     loading={loading}
                     onEnrollModule={handleEnrollModule}

@@ -34,6 +34,12 @@ const trainingModuleSchema = new mongoose.Schema(
         ref: "Skill",
       },
     ],
+    targetDivisions: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
   },
   { timestamps: true },
 );

@@ -107,6 +107,21 @@ function HRModulCreate({
           Wajib isi minimal salah satu: Link Materi atau File Materi.
         </p>
 
+        <input
+          className="glass-input w-full rounded-lg px-3 py-2 text-sm text-white outline-none placeholder:text-slate-300"
+          placeholder="Target Divisi (pisahkan dengan koma, contoh: Engineering, Product)"
+          value={(newModuleForm.targetDivisions || []).join(", ")}
+          onChange={(event) =>
+            setNewModuleForm((prev) => ({
+              ...prev,
+              targetDivisions: event.target.value
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean),
+            }))
+          }
+        />
+
         <div ref={ref} className="relative">
           <div className="mb-2 text-sm font-medium text-slate-800">
             Target Skills

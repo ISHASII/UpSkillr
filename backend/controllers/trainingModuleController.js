@@ -31,6 +31,22 @@ const getTrainingModules = async (req, res, next) => {
   }
 };
 
+const getRecommendedTrainingModules = async (req, res, next) => {
+  try {
+    const modules =
+      await trainingModuleService.getRecommendedTrainingModulesForUser(
+        req.user._id,
+      );
+
+    res.status(200).json({
+      success: true,
+      data: modules,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getTrainingModuleById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -126,6 +142,7 @@ const deleteTrainingModule = async (req, res, next) => {
 module.exports = {
   createTrainingModule,
   getTrainingModules,
+  getRecommendedTrainingModules,
   getTrainingModuleById,
   updateTrainingModule,
   deleteTrainingModule,

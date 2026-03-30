@@ -14,6 +14,13 @@ router.get(
   asyncHandler(trainingModuleController.getTrainingModules),
 );
 
+router.get(
+  "/recommendations/me",
+  authMiddleware,
+  roleMiddleware("Karyawan"),
+  asyncHandler(trainingModuleController.getRecommendedTrainingModules),
+);
+
 router.post(
   "/",
   authMiddleware,

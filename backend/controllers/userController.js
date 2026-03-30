@@ -30,6 +30,19 @@ const getUsers = async (req, res, next) => {
   }
 };
 
+const getPendingRegistrations = async (req, res, next) => {
+  try {
+    const users = await userService.getPendingRegistrations();
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getUserById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -70,7 +83,23 @@ const updateUser = async (req, res, next) => {
       });
     }
 
-    const user = await userService.updateUser(id, req.body);
+    if (req.user?.role === "Karyawan" && String(req.user._id) !== String(id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Karyawan hanya bisa memperbarui profil sendiri",
+      });
+    }
+
+    const payload =
+      req.user?.role === "Karyawan"
+        ? {
+            nama: req.body?.nama,
+            email: req.body?.email,
+            divisi: req.body?.divisi,
+          }
+        : req.body;
+
+    const user = await userService.updateUser(id, payload);
 
     if (!user) {
       return res.status(404).json({
@@ -122,6 +151,39 @@ const updateProfileSkills = async (req, res, next) => {
   }
 };
 
+const decideRegistration = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Format ID user tidak valid",
+      });
+    }
+
+    const user = await userService.decideRegistration(id, req.body, req.user);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User tidak ditemukan",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message:
+        req.body?.status === "approved"
+          ? "Registrasi karyawan disetujui"
+          : "Registrasi karyawan ditolak",
+      data: user,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -154,8 +216,10 @@ const deleteUser = async (req, res, next) => {
 module.exports = {
   createUser,
   getUsers,
+  getPendingRegistrations,
   getUserById,
   updateUser,
   updateProfileSkills,
+  decideRegistration,
   deleteUser,
 };

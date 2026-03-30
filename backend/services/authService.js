@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User");
 
 const createToken = (user) => {
@@ -26,6 +27,55 @@ const OTP_COOLDOWN_SECONDS = Number(
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
 
 let transporter = null;
+let googleOauthClient = null;
+
+const buildAuthResponse = (user) => ({
+  token: createToken(user),
+  user: {
+    id: user._id,
+    nama: user.nama,
+    email: user.email,
+    role: user.role,
+    divisi: user.divisi,
+    skills: user.skills,
+    registrationStatus: user.registrationStatus,
+  },
+});
+
+const assertKaryawanApprovalStatus = (user) => {
+  if (user.role === "Karyawan" && user.registrationStatus !== "approved") {
+    if (user.registrationStatus === "pending") {
+      const error = new Error(
+        "Akun kamu masih menunggu persetujuan HRD. Cek email untuk notifikasi.",
+      );
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const error = new Error(
+      "Registrasi akun kamu ditolak HRD. Cek email untuk detail atau hubungi HRD.",
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+};
+
+const getGoogleOauthClient = () => {
+  const googleClientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+  if (!googleClientId) {
+    const error = new Error(
+      "GOOGLE_CLIENT_ID belum diatur di environment backend",
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+
+  if (!googleOauthClient) {
+    googleOauthClient = new OAuth2Client(googleClientId);
+  }
+
+  return { googleOauthClient, googleClientId };
+};
 
 const getMailerTransporter = () => {
   if (transporter) return transporter;
@@ -90,8 +140,76 @@ const sendForgotPasswordOtpEmail = async ({ email, nama, otpCode }) => {
   });
 };
 
+const sendRegistrationDecisionEmail = async ({
+  email,
+  nama,
+  status,
+  divisi,
+  reason,
+}) => {
+  const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const mailer = getMailerTransporter();
+
+  const isApproved = status === "approved";
+  const subject = isApproved
+    ? "Registrasi UpSkillr Disetujui"
+    : "Registrasi UpSkillr Ditolak";
+
+  const html = isApproved
+    ? `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">Registrasi Disetujui</h2>
+        <p>Halo ${nama || "Karyawan"},</p>
+        <p>Registrasi akun UpSkillr kamu telah <b>disetujui</b> oleh HRD.</p>
+        <p>Divisi kamu telah diatur ke: <b>${divisi || "-"}</b>.</p>
+        <p>Silakan login dan mulai pelatihan yang direkomendasikan sistem.</p>
+      </div>
+    `
+    : `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">Registrasi Ditolak</h2>
+        <p>Halo ${nama || "Karyawan"},</p>
+        <p>Mohon maaf, registrasi akun UpSkillr kamu <b>belum dapat disetujui</b>.</p>
+        <p>Alasan: ${reason || "Tidak ada alasan tambahan"}</p>
+        <p>Silakan hubungi HRD untuk informasi lebih lanjut.</p>
+      </div>
+    `;
+
+  const text = isApproved
+    ? `Halo ${nama || "Karyawan"}, registrasi UpSkillr kamu disetujui. Divisi: ${divisi || "-"}. Silakan login.`
+    : `Halo ${nama || "Karyawan"}, registrasi UpSkillr kamu ditolak. Alasan: ${reason || "Tidak ada alasan tambahan"}.`;
+
+  await mailer.sendMail({
+    from: fromAddress,
+    to: email,
+    subject,
+    html,
+    text,
+  });
+};
+
 const register = async (payload) => {
-  const { nama, email, password, role, divisi, skills = [] } = payload;
+  const { nama, email, password, skills = [], role, divisi } = payload;
+
+  const normalizedRoleInput = String(role || "Karyawan")
+    .trim()
+    .toUpperCase();
+  const requestedRole =
+    normalizedRoleInput === "HRD"
+      ? "HR"
+      : normalizedRoleInput === "HR"
+        ? "HR"
+        : normalizedRoleInput === "KARYAWAN"
+          ? "Karyawan"
+          : null;
+
+  if (!requestedRole) {
+    const error = new Error("Role tidak valid");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const requiresApproval = requestedRole === "Karyawan";
 
   const existingUser = await User.findOne({ email: email.toLowerCase() });
   if (existingUser) {
@@ -104,15 +222,13 @@ const register = async (payload) => {
     nama,
     email,
     password,
-    role,
-    divisi,
+    role: requestedRole,
+    registrationStatus: requiresApproval ? "pending" : "approved",
+    divisi: requestedRole === "HR" ? divisi || "HR" : "",
     skills,
   });
 
-  const token = createToken(user);
-
   return {
-    token,
     user: {
       id: user._id,
       nama: user.nama,
@@ -120,7 +236,9 @@ const register = async (payload) => {
       role: user.role,
       divisi: user.divisi,
       skills: user.skills,
+      registrationStatus: user.registrationStatus,
     },
+    requiresApproval,
   };
 };
 
@@ -145,19 +263,66 @@ const login = async (payload) => {
     throw error;
   }
 
-  const token = createToken(user);
+  assertKaryawanApprovalStatus(user);
 
-  return {
-    token,
-    user: {
-      id: user._id,
-      nama: user.nama,
-      email: user.email,
-      role: user.role,
-      divisi: user.divisi,
-      skills: user.skills,
-    },
-  };
+  return buildAuthResponse(user);
+};
+
+const loginWithGoogle = async (payload) => {
+  const credential = String(
+    payload?.credential || payload?.idToken || "",
+  ).trim();
+
+  if (!credential) {
+    const error = new Error("Credential Google wajib diisi");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { googleOauthClient, googleClientId } = getGoogleOauthClient();
+
+  let googlePayload;
+  try {
+    const ticket = await googleOauthClient.verifyIdToken({
+      idToken: credential,
+      audience: googleClientId,
+    });
+    googlePayload = ticket.getPayload();
+  } catch {
+    const error = new Error("Token Google tidak valid");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const googleEmail = String(googlePayload?.email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!googleEmail || googlePayload?.email_verified !== true) {
+    const error = new Error(
+      "Email Google tidak valid atau belum terverifikasi",
+    );
+    error.statusCode = 401;
+    throw error;
+  }
+
+  let user = await User.findOne({ email: googleEmail }).select("+password");
+
+  if (!user) {
+    user = await User.create({
+      nama: String(googlePayload?.name || "Google User").trim(),
+      email: googleEmail,
+      password: crypto.randomBytes(24).toString("hex"),
+      role: "Karyawan",
+      registrationStatus: "pending",
+      divisi: "",
+      skills: [],
+    });
+  }
+
+  assertKaryawanApprovalStatus(user);
+
+  return buildAuthResponse(user);
 };
 
 const requestForgotPasswordOtp = async (payload) => {
@@ -367,7 +532,9 @@ const resetPasswordWithOtp = async (payload) => {
 module.exports = {
   register,
   login,
+  loginWithGoogle,
   requestForgotPasswordOtp,
   verifyForgotPasswordOtp,
   resetPasswordWithOtp,
+  sendRegistrationDecisionEmail,
 };
