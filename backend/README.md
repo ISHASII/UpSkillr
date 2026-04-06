@@ -1,5 +1,14 @@
 # Backend API - Employee Skill Matcher & Training Hub
 
+## Swagger API Docs
+
+Swagger sudah aktif di backend:
+
+- UI: `http://localhost:5000/api-docs`
+- JSON Spec: `http://localhost:5000/api-docs.json`
+
+Untuk endpoint yang butuh auth, klik tombol **Authorize** di Swagger dan isi JWT token.
+
 ## 1) Persiapan
 
 Pastikan sudah install:

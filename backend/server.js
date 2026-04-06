@@ -17,9 +17,11 @@ try {
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const swaggerUi = require("swagger-ui-express");
 
 const connectDB = require("./config/database");
 const apiRoutes = require("./routes");
+const swaggerSpec = require("./docs/swagger");
 const { notFoundHandler, errorHandler } = require("./middlewares/errorHandler");
 
 const app = express();
@@ -36,6 +38,12 @@ app.get("/api/health", (req, res) => {
     success: true,
     message: "Employee Skill Matcher & Training Hub API berjalan",
   });
+});
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get("/api-docs.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
 });
 
 app.use("/api", apiRoutes);
