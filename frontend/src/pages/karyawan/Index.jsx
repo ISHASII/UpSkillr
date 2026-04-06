@@ -1,5 +1,6 @@
 import ActionsPanel from "./components/ActionsPanel";
 import LogsPanel from "./components/LogsPanel";
+import RecommendationPanel from "./components/RecommendationPanel";
 
 function KaryawanDashboardPage({ logs }) {
   return (
@@ -14,6 +15,9 @@ function KaryawanDashboardPage({ logs }) {
           <span className="font-semibold"> Daftar Modul</span>.
         </p>
       </div>
+
+      {/* AI Recommendation Section */}
+      <RecommendationPanel />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <ActionsPanel logs={logs} />
