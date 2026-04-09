@@ -266,27 +266,7 @@ Best practice commit:
 - Pisahkan commit per unit perubahan agar mudah review.
 - Hindari commit campuran antara refactor dan fitur baru.
 
-## 12. Development Flow and Timeline
-
-Referensi alur pengembangan (11 hari):
-
-### Week 1
-
-- Day 1: Initial setup project, install dependency, pastikan app berjalan.
-- Day 2: Project planning, desain database, desain halaman, API spec.
-- Day 3-7: Implementasi backend dan frontend inti (auth, CRUD, role access, AI basic).
-
-### Week 2
-
-- Day 8-9: Tambahan fitur, sinkronisasi data, refactor, optimasi.
-- Day 10: Finalisasi MVP, dokumentasi, siapkan demo dan slide.
-- Day 11: Final code review, presentasi, merge ke branch utama.
-
-Penyesuaian spesifikasi:
-
-- Minggu kedua digunakan untuk review ulang requirement agar selaras dengan karakteristik unik UpSkillr.
-
-## 13. Local Setup
+## 12. Local Setup
 
 ### Prerequisites
 
@@ -333,7 +313,7 @@ VITE_API_URL=http://localhost:5000
 VITE_GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
 ```
 
-## 14. Demo Scenario for Presentation
+## 13. Demo Scenario for Presentation
 
 Alur demo yang direkomendasikan saat presentasi:
 
@@ -345,7 +325,7 @@ Alur demo yang direkomendasikan saat presentasi:
 - HR melakukan validasi progress.
 - Tampilkan hasil AI recommendation untuk user.
 
-## 15. End-to-End System Workflow (Register to Completion)
+## 14. End-to-End System Workflow (Register to Completion)
 
 Berikut alur operasional lengkap sistem dari awal sampai akhir:
 
@@ -400,7 +380,7 @@ Berikut alur operasional lengkap sistem dari awal sampai akhir:
 - HR memiliki visibilitas perkembangan skill lintas divisi.
 - Keputusan pengembangan kompetensi didukung AI recommendation dan data progress aktual.
 
-## 16. PPT Outline (Ready-to-Use)
+## 15. PPT Outline (Ready-to-Use)
 
 Kamu bisa langsung jadikan README ini ke slide dengan urutan berikut:
 
@@ -417,7 +397,7 @@ Kamu bisa langsung jadikan README ini ke slide dengan urutan berikut:
 - Slide 11: Git workflow dan quality process.
 - Slide 12: Timeline development + hasil akhir + next roadmap.
 
-## 17. Optional Enhancements (Recommended Next Sprint)
+## 16. Optional Enhancements (Recommended Next Sprint)
 
 Untuk memperkuat production readiness:
 
@@ -428,7 +408,7 @@ Untuk memperkuat production readiness:
 - Tambahkan CI/CD pipeline (lint, test, build, deploy otomatis).
 - Tambahkan role audit trail untuk compliance.
 
-## 18. Conclusion
+## 17. Conclusion
 
 UpSkillr menunjukkan implementasi AI web solution yang relevan untuk kebutuhan enterprise internal:
 
